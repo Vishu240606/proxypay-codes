@@ -14,7 +14,93 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      payment_codes: {
+        Row: {
+          amount: number | null
+          code: string
+          created_at: string
+          expires_at: string
+          id: string
+          receiver_id: string
+          used: boolean
+          used_at: string | null
+        }
+        Insert: {
+          amount?: number | null
+          code: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          receiver_id: string
+          used?: boolean
+          used_at?: string | null
+        }
+        Update: {
+          amount?: number | null
+          code?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          receiver_id?: string
+          used?: boolean
+          used_at?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          balance: number
+          created_at: string
+          email: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          balance?: number
+          created_at?: string
+          email: string
+          id: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          balance?: number
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      transactions: {
+        Row: {
+          amount: number
+          code: string
+          created_at: string
+          id: string
+          receiver_id: string
+          sender_id: string
+        }
+        Insert: {
+          amount: number
+          code: string
+          created_at?: string
+          id?: string
+          receiver_id: string
+          sender_id: string
+        }
+        Update: {
+          amount?: number
+          code?: string
+          created_at?: string
+          id?: string
+          receiver_id?: string
+          sender_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
