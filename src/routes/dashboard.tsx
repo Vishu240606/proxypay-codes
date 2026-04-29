@@ -398,6 +398,12 @@ function DashboardPage() {
           )}
         </GlassCard>
       </main>
+
+      <FaceAuthModal
+        open={faceAuthOpen}
+        onCancel={cancelFaceAuth}
+        onVerified={completePayment}
+      />
     </div>
   );
 }
