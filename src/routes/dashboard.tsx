@@ -385,7 +385,7 @@ function DashboardPage() {
               <Send className="h-4 w-4 text-primary" />
               <h2 className="text-base font-semibold">Send money</h2>
             </div>
-            <form onSubmit={handleSend} className="space-y-4">
+            <form onSubmit={startPaymentFlow} className="space-y-4">
               <GlassInput
                 type="email"
                 name="receiver"
