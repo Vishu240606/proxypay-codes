@@ -8,6 +8,7 @@ import { GlassCard } from "@/components/GlassCard";
 import { GlassInput } from "@/components/GlassInput";
 import { GlowButton } from "@/components/GlowButton";
 import { Logo } from "@/components/Logo";
+import { FaceAuthModal } from "@/components/FaceAuthModal";
 import { requestPaymentCode, sendMoney } from "@/server/payments.functions";
 import { useAuthedFn } from "@/hooks/useAuthedFn";
 
