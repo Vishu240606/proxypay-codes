@@ -190,4 +190,14 @@
   .animate-pulse-glow {
     animation: pulseGlow 2s var(--ease-smooth) infinite;
   }
+
+  @keyframes scan {
+    0% { transform: translateY(0); }
+    50% { transform: translateY(13rem); }
+    100% { transform: translateY(0); }
+  }
+
+  .animate-scan {
+    animation: scan 1.8s ease-in-out infinite;
+  }
 }

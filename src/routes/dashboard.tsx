@@ -8,6 +8,7 @@ import { GlassCard } from "@/components/GlassCard";
 import { GlassInput } from "@/components/GlassInput";
 import { GlowButton } from "@/components/GlowButton";
 import { Logo } from "@/components/Logo";
+import { FaceAuthModal } from "@/components/FaceAuthModal";
 import { requestPaymentCode, sendMoney } from "@/server/payments.functions";
 import { useAuthedFn } from "@/hooks/useAuthedFn";
 
@@ -67,6 +68,7 @@ function DashboardPage() {
   const [sendAmt, setSendAmt] = useState("");
   const [sendCode, setSendCode] = useState("");
   const [sending, setSending] = useState(false);
+  const [faceAuthOpen, setFaceAuthOpen] = useState(false);
 
   const loadProfile = async () => {
     const { data: sess } = await supabase.auth.getSession();
@@ -154,13 +156,20 @@ function DashboardPage() {
     setTimeout(() => setCopied(false), 1500);
   };
 
-  const handleSend = async (e: FormEvent) => {
+  const handleSend = (e: FormEvent) => {
     e.preventDefault();
     const amt = Number(sendAmt);
     if (!sendEmail || !sendCode || isNaN(amt) || amt <= 0) {
       toast.error("Fill in all fields with a valid amount");
       return;
     }
+    // Trigger face auth before performing the transfer
+    setFaceAuthOpen(true);
+  };
+
+  const completePayment = async () => {
+    setFaceAuthOpen(false);
+    const amt = Number(sendAmt);
     setSending(true);
     try {
       const result = await sendFn({
@@ -180,6 +189,11 @@ function DashboardPage() {
     } finally {
       setSending(false);
     }
+  };
+
+  const cancelFaceAuth = () => {
+    setFaceAuthOpen(false);
+    toast.info("Payment cancelled");
   };
 
   const mm = String(Math.floor(secondsLeft / 60)).padStart(2, "0");
@@ -343,8 +357,8 @@ function DashboardPage() {
                 required
                 className="font-mono tracking-widest"
               />
-              <GlowButton type="submit" loading={sending}>
-                {sending ? "Sending…" : "Send money"}
+              <GlowButton type="submit" loading={sending || faceAuthOpen}>
+                {sending ? "Sending…" : faceAuthOpen ? "Verifying…" : "Send money"}
               </GlowButton>
             </form>
           </GlassCard>
@@ -384,6 +398,12 @@ function DashboardPage() {
           )}
         </GlassCard>
       </main>
+
+      <FaceAuthModal
+        open={faceAuthOpen}
+        onCancel={cancelFaceAuth}
+        onVerified={completePayment}
+      />
     </div>
   );
 }
