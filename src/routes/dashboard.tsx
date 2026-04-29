@@ -156,13 +156,20 @@ function DashboardPage() {
     setTimeout(() => setCopied(false), 1500);
   };
 
-  const handleSend = async (e: FormEvent) => {
+  const handleSend = (e: FormEvent) => {
     e.preventDefault();
     const amt = Number(sendAmt);
     if (!sendEmail || !sendCode || isNaN(amt) || amt <= 0) {
       toast.error("Fill in all fields with a valid amount");
       return;
     }
+    // Trigger face auth before performing the transfer
+    setFaceAuthOpen(true);
+  };
+
+  const completePayment = async () => {
+    setFaceAuthOpen(false);
+    const amt = Number(sendAmt);
     setSending(true);
     try {
       const result = await sendFn({
@@ -182,6 +189,11 @@ function DashboardPage() {
     } finally {
       setSending(false);
     }
+  };
+
+  const cancelFaceAuth = () => {
+    setFaceAuthOpen(false);
+    toast.info("Payment cancelled");
   };
 
   const mm = String(Math.floor(secondsLeft / 60)).padStart(2, "0");
