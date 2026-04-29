@@ -8,8 +8,16 @@ import { GlassCard } from "@/components/GlassCard";
 import { GlassInput } from "@/components/GlassInput";
 import { GlowButton } from "@/components/GlowButton";
 import { Logo } from "@/components/Logo";
-import { FaceAuthModal } from "@/components/FaceAuthModal";
-import { requestPaymentCode, sendMoney } from "@/server/payments.functions";
+import {
+  PaymentFlowModal,
+  type PaymentStep,
+  type PaymentSuccessData,
+} from "@/components/PaymentFlowModal";
+import {
+  requestPaymentCode,
+  sendMoney,
+  validatePaymentCode,
+} from "@/server/payments.functions";
 import { useAuthedFn } from "@/hooks/useAuthedFn";
 
 interface Profile {
@@ -55,6 +63,7 @@ function DashboardPage() {
 
   const requestFn = useAuthedFn(useServerFn(requestPaymentCode));
   const sendFn = useAuthedFn(useServerFn(sendMoney));
+  const validateFn = useAuthedFn(useServerFn(validatePaymentCode));
 
   // Active code state
   const [activeCode, setActiveCode] = useState<{ code: string; expiresAt: string } | null>(null);
@@ -67,8 +76,13 @@ function DashboardPage() {
   const [sendEmail, setSendEmail] = useState("");
   const [sendAmt, setSendAmt] = useState("");
   const [sendCode, setSendCode] = useState("");
-  const [sending, setSending] = useState(false);
-  const [faceAuthOpen, setFaceAuthOpen] = useState(false);
+
+  // Payment flow
+  const [flowOpen, setFlowOpen] = useState(false);
+  const [flowStep, setFlowStep] = useState<PaymentStep>("validating");
+  const [flowError, setFlowError] = useState<string | undefined>();
+  const [successData, setSuccessData] = useState<PaymentSuccessData | undefined>();
+  const sending = flowOpen && flowStep !== "success" && flowStep !== "validation-error" && flowStep !== "error";
 
   const loadProfile = async () => {
     const { data: sess } = await supabase.auth.getSession();
@@ -156,21 +170,54 @@ function DashboardPage() {
     setTimeout(() => setCopied(false), 1500);
   };
 
-  const handleSend = (e: FormEvent) => {
+  const startPaymentFlow = async (e: FormEvent) => {
     e.preventDefault();
     const amt = Number(sendAmt);
     if (!sendEmail || !sendCode || isNaN(amt) || amt <= 0) {
       toast.error("Fill in all fields with a valid amount");
       return;
     }
-    // Trigger face auth before performing the transfer
-    setFaceAuthOpen(true);
+
+    setFlowError(undefined);
+    setSuccessData(undefined);
+    setFlowStep("validating");
+    setFlowOpen(true);
+
+    // Step 1: validate code
+    try {
+      await validateFn({
+        data: {
+          receiverEmail: sendEmail.trim().toLowerCase(),
+          amount: amt,
+          code: sendCode.trim().toUpperCase(),
+        },
+      });
+    } catch (err) {
+      setFlowError(err instanceof Error ? err.message : "Invalid verification code");
+      setFlowStep("validation-error");
+      return;
+    }
+
+    // Step 2: face auth
+    setFlowStep("face-scanning");
+  };
+
+  // Simulated face auth — randomly fails ~15% of the time for realism
+  const handleFaceVerified = () => {
+    if (Math.random() < 0.15) {
+      setFlowStep("face-failed");
+      return;
+    }
+    void completePayment();
+  };
+
+  const handleFaceRetry = () => {
+    setFlowStep("face-scanning");
   };
 
   const completePayment = async () => {
-    setFaceAuthOpen(false);
+    setFlowStep("processing");
     const amt = Number(sendAmt);
-    setSending(true);
     try {
       const result = await sendFn({
         data: {
@@ -179,21 +226,35 @@ function DashboardPage() {
           code: sendCode.trim().toUpperCase(),
         },
       });
-      toast.success(`Sent ${fmtMoney(result.amount)} to ${result.receiverEmail}`);
-      setSendEmail("");
-      setSendAmt("");
-      setSendCode("");
+      const txId =
+        "TX-" +
+        Math.random().toString(36).slice(2, 8).toUpperCase() +
+        "-" +
+        Date.now().toString(36).toUpperCase();
+      setSuccessData({
+        amount: result.amount,
+        receiverEmail: result.receiverEmail,
+        transactionId: txId,
+        timestamp: new Date().toISOString(),
+      });
+      setFlowStep("success");
       await loadProfile();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Payment failed");
-    } finally {
-      setSending(false);
+      setFlowError(err instanceof Error ? err.message : "Payment failed");
+      setFlowStep("error");
     }
   };
 
-  const cancelFaceAuth = () => {
-    setFaceAuthOpen(false);
-    toast.info("Payment cancelled");
+  const closeFlow = () => {
+    if (flowStep === "processing") return;
+    setFlowOpen(false);
+  };
+
+  const finishFlow = () => {
+    setFlowOpen(false);
+    setSendEmail("");
+    setSendAmt("");
+    setSendCode("");
   };
 
   const mm = String(Math.floor(secondsLeft / 60)).padStart(2, "0");
@@ -324,7 +385,7 @@ function DashboardPage() {
               <Send className="h-4 w-4 text-primary" />
               <h2 className="text-base font-semibold">Send money</h2>
             </div>
-            <form onSubmit={handleSend} className="space-y-4">
+            <form onSubmit={startPaymentFlow} className="space-y-4">
               <GlassInput
                 type="email"
                 name="receiver"
@@ -357,8 +418,8 @@ function DashboardPage() {
                 required
                 className="font-mono tracking-widest"
               />
-              <GlowButton type="submit" loading={sending || faceAuthOpen}>
-                {sending ? "Sending…" : faceAuthOpen ? "Verifying…" : "Send money"}
+              <GlowButton type="submit" loading={sending}>
+                {sending ? "Processing…" : "Send money"}
               </GlowButton>
             </form>
           </GlassCard>
@@ -399,10 +460,15 @@ function DashboardPage() {
         </GlassCard>
       </main>
 
-      <FaceAuthModal
-        open={faceAuthOpen}
-        onCancel={cancelFaceAuth}
-        onVerified={completePayment}
+      <PaymentFlowModal
+        open={flowOpen}
+        step={flowStep}
+        errorMessage={flowError}
+        successData={successData}
+        onCancel={closeFlow}
+        onFaceVerified={handleFaceVerified}
+        onFaceRetry={handleFaceRetry}
+        onDone={finishFlow}
       />
     </div>
   );

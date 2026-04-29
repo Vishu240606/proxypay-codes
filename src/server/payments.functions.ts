@@ -54,6 +54,60 @@ export const requestPaymentCode = createServerFn({ method: "POST" })
     );
   });
 
+const ValidateSchema = z.object({
+  receiverEmail: z.string().email().max(255),
+  amount: z.number().positive().max(1_000_000),
+  code: z.string().min(4).max(20).trim(),
+});
+
+export const validatePaymentCode = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => ValidateSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const senderId = context.userId;
+
+    const { data: codeRow } = await supabaseAdmin
+      .from("payment_codes")
+      .select("*")
+      .eq("code", data.code.toUpperCase())
+      .maybeSingle();
+
+    if (!codeRow) throw new Error("Invalid verification code");
+    if (codeRow.used) throw new Error("Code already used");
+    if (new Date(codeRow.expires_at).getTime() < Date.now()) {
+      throw new Error("Verification code has expired");
+    }
+
+    const { data: receiver } = await supabaseAdmin
+      .from("profiles")
+      .select("id, email")
+      .eq("email", data.receiverEmail.toLowerCase())
+      .maybeSingle();
+
+    if (!receiver) throw new Error("Receiver not found");
+    if (receiver.id !== codeRow.receiver_id) {
+      throw new Error("Code does not match receiver");
+    }
+    if (receiver.id === senderId) {
+      throw new Error("Cannot send money to yourself");
+    }
+    if (codeRow.amount != null && Number(codeRow.amount) !== data.amount) {
+      throw new Error(`Amount must be exactly $${Number(codeRow.amount).toFixed(2)}`);
+    }
+
+    const { data: sender } = await supabaseAdmin
+      .from("profiles")
+      .select("balance")
+      .eq("id", senderId)
+      .single();
+
+    if (!sender || Number(sender.balance) < data.amount) {
+      throw new Error("Insufficient balance");
+    }
+
+    return { ok: true as const };
+  });
+
 const SendSchema = z.object({
   receiverEmail: z.string().email().max(255),
   amount: z.number().positive().max(1_000_000),
