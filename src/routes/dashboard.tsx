@@ -63,6 +63,7 @@ function DashboardPage() {
 
   const requestFn = useAuthedFn(useServerFn(requestPaymentCode));
   const sendFn = useAuthedFn(useServerFn(sendMoney));
+  const validateFn = useAuthedFn(useServerFn(validatePaymentCode));
 
   // Active code state
   const [activeCode, setActiveCode] = useState<{ code: string; expiresAt: string } | null>(null);
@@ -75,8 +76,13 @@ function DashboardPage() {
   const [sendEmail, setSendEmail] = useState("");
   const [sendAmt, setSendAmt] = useState("");
   const [sendCode, setSendCode] = useState("");
-  const [sending, setSending] = useState(false);
-  const [faceAuthOpen, setFaceAuthOpen] = useState(false);
+
+  // Payment flow
+  const [flowOpen, setFlowOpen] = useState(false);
+  const [flowStep, setFlowStep] = useState<PaymentStep>("validating");
+  const [flowError, setFlowError] = useState<string | undefined>();
+  const [successData, setSuccessData] = useState<PaymentSuccessData | undefined>();
+  const sending = flowOpen && flowStep !== "success" && flowStep !== "validation-error" && flowStep !== "error";
 
   const loadProfile = async () => {
     const { data: sess } = await supabase.auth.getSession();
