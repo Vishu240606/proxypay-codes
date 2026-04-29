@@ -170,21 +170,54 @@ function DashboardPage() {
     setTimeout(() => setCopied(false), 1500);
   };
 
-  const handleSend = (e: FormEvent) => {
+  const startPaymentFlow = async (e: FormEvent) => {
     e.preventDefault();
     const amt = Number(sendAmt);
     if (!sendEmail || !sendCode || isNaN(amt) || amt <= 0) {
       toast.error("Fill in all fields with a valid amount");
       return;
     }
-    // Trigger face auth before performing the transfer
-    setFaceAuthOpen(true);
+
+    setFlowError(undefined);
+    setSuccessData(undefined);
+    setFlowStep("validating");
+    setFlowOpen(true);
+
+    // Step 1: validate code
+    try {
+      await validateFn({
+        data: {
+          receiverEmail: sendEmail.trim().toLowerCase(),
+          amount: amt,
+          code: sendCode.trim().toUpperCase(),
+        },
+      });
+    } catch (err) {
+      setFlowError(err instanceof Error ? err.message : "Invalid verification code");
+      setFlowStep("validation-error");
+      return;
+    }
+
+    // Step 2: face auth
+    setFlowStep("face-scanning");
+  };
+
+  // Simulated face auth — randomly fails ~15% of the time for realism
+  const handleFaceVerified = () => {
+    if (Math.random() < 0.15) {
+      setFlowStep("face-failed");
+      return;
+    }
+    void completePayment();
+  };
+
+  const handleFaceRetry = () => {
+    setFlowStep("face-scanning");
   };
 
   const completePayment = async () => {
-    setFaceAuthOpen(false);
+    setFlowStep("processing");
     const amt = Number(sendAmt);
-    setSending(true);
     try {
       const result = await sendFn({
         data: {
@@ -193,21 +226,35 @@ function DashboardPage() {
           code: sendCode.trim().toUpperCase(),
         },
       });
-      toast.success(`Sent ${fmtMoney(result.amount)} to ${result.receiverEmail}`);
-      setSendEmail("");
-      setSendAmt("");
-      setSendCode("");
+      const txId =
+        "TX-" +
+        Math.random().toString(36).slice(2, 8).toUpperCase() +
+        "-" +
+        Date.now().toString(36).toUpperCase();
+      setSuccessData({
+        amount: result.amount,
+        receiverEmail: result.receiverEmail,
+        transactionId: txId,
+        timestamp: new Date().toISOString(),
+      });
+      setFlowStep("success");
       await loadProfile();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Payment failed");
-    } finally {
-      setSending(false);
+      setFlowError(err instanceof Error ? err.message : "Payment failed");
+      setFlowStep("error");
     }
   };
 
-  const cancelFaceAuth = () => {
-    setFaceAuthOpen(false);
-    toast.info("Payment cancelled");
+  const closeFlow = () => {
+    if (flowStep === "processing") return;
+    setFlowOpen(false);
+  };
+
+  const finishFlow = () => {
+    setFlowOpen(false);
+    setSendEmail("");
+    setSendAmt("");
+    setSendCode("");
   };
 
   const mm = String(Math.floor(secondsLeft / 60)).padStart(2, "0");
