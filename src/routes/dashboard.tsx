@@ -460,10 +460,15 @@ function DashboardPage() {
         </GlassCard>
       </main>
 
-      <FaceAuthModal
-        open={faceAuthOpen}
-        onCancel={cancelFaceAuth}
-        onVerified={completePayment}
+      <PaymentFlowModal
+        open={flowOpen}
+        step={flowStep}
+        errorMessage={flowError}
+        successData={successData}
+        onCancel={closeFlow}
+        onFaceVerified={handleFaceVerified}
+        onFaceRetry={handleFaceRetry}
+        onDone={finishFlow}
       />
     </div>
   );
