@@ -68,6 +68,7 @@ function DashboardPage() {
   const [sendAmt, setSendAmt] = useState("");
   const [sendCode, setSendCode] = useState("");
   const [sending, setSending] = useState(false);
+  const [faceAuthOpen, setFaceAuthOpen] = useState(false);
 
   const loadProfile = async () => {
     const { data: sess } = await supabase.auth.getSession();
