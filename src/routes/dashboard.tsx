@@ -418,8 +418,8 @@ function DashboardPage() {
                 required
                 className="font-mono tracking-widest"
               />
-              <GlowButton type="submit" loading={sending || faceAuthOpen}>
-                {sending ? "Sending…" : faceAuthOpen ? "Verifying…" : "Send money"}
+              <GlowButton type="submit" loading={sending}>
+                {sending ? "Processing…" : "Send money"}
               </GlowButton>
             </form>
           </GlassCard>
