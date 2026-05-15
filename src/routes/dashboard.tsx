@@ -2,12 +2,12 @@ import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { LogOut, Wallet, KeyRound, Send, Copy, Check, Clock } from "lucide-react";
+import { Wallet, KeyRound, Send, Copy, Check, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { GlassCard } from "@/components/GlassCard";
 import { GlassInput } from "@/components/GlassInput";
 import { GlowButton } from "@/components/GlowButton";
-import { Logo } from "@/components/Logo";
+import { AppNav } from "@/components/AppNav";
 import {
   PaymentFlowModal,
   type PaymentStep,
@@ -19,6 +19,7 @@ import {
   validatePaymentCode,
 } from "@/server/payments.functions";
 import { useAuthedFn } from "@/hooks/useAuthedFn";
+import { pushNotification } from "@/lib/notifications";
 
 interface Profile {
   id: string;
