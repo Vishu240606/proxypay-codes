@@ -194,8 +194,14 @@ function DashboardPage() {
         },
       });
     } catch (err) {
-      setFlowError(err instanceof Error ? err.message : "Invalid verification code");
+      const msg = err instanceof Error ? err.message : "Invalid verification code";
+      setFlowError(msg);
       setFlowStep("validation-error");
+      pushNotification({
+        kind: "security",
+        title: "Invalid session attempt blocked",
+        message: `${msg}. Receiver: ${sendEmail.trim().toLowerCase()}`,
+      });
       return;
     }
 
@@ -207,6 +213,11 @@ function DashboardPage() {
   const handleFaceVerified = () => {
     if (Math.random() < 0.15) {
       setFlowStep("face-failed");
+      pushNotification({
+        kind: "security",
+        title: "Biometric verification failed",
+        message: "Face authentication did not match. Payment not processed.",
+      });
       return;
     }
     void completePayment();
