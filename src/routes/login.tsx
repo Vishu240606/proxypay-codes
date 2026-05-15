@@ -48,6 +48,7 @@ function LoginPage() {
     }
     if (data.user) {
       localStorage.setItem("userId", data.user.id);
+      localStorage.setItem("proxipay.sessionStart", String(Date.now()));
       toast.success("Welcome back!");
       navigate({ to: "/dashboard" });
     }

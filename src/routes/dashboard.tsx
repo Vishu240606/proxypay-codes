@@ -2,12 +2,12 @@ import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { LogOut, Wallet, KeyRound, Send, Copy, Check, Clock } from "lucide-react";
+import { Wallet, KeyRound, Send, Copy, Check, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { GlassCard } from "@/components/GlassCard";
 import { GlassInput } from "@/components/GlassInput";
 import { GlowButton } from "@/components/GlowButton";
-import { Logo } from "@/components/Logo";
+import { AppNav } from "@/components/AppNav";
 import {
   PaymentFlowModal,
   type PaymentStep,
@@ -19,6 +19,7 @@ import {
   validatePaymentCode,
 } from "@/server/payments.functions";
 import { useAuthedFn } from "@/hooks/useAuthedFn";
+import { pushNotification } from "@/lib/notifications";
 
 interface Profile {
   id: string;
@@ -135,13 +136,6 @@ function DashboardPage() {
     return () => clearInterval(id);
   }, [activeCode]);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    localStorage.removeItem("userId");
-    toast.success("Logged out");
-    navigate({ to: "/login" });
-  };
-
   const handleGenerate = async (e: FormEvent) => {
     e.preventDefault();
     setGenerating(true);
@@ -156,6 +150,13 @@ function DashboardPage() {
       setActiveCode({ code: result.code, expiresAt: result.expiresAt });
       setReqAmount("");
       toast.success("Code generated — share it with the sender");
+      pushNotification({
+        kind: "session",
+        title: "New verification code issued",
+        message: `Code ${result.code} is active for 2 minutes${
+          amt ? ` for ${amt.toFixed(2)} USD` : ""
+        }.`,
+      });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to generate code");
     } finally {
@@ -193,8 +194,14 @@ function DashboardPage() {
         },
       });
     } catch (err) {
-      setFlowError(err instanceof Error ? err.message : "Invalid verification code");
+      const msg = err instanceof Error ? err.message : "Invalid verification code";
+      setFlowError(msg);
       setFlowStep("validation-error");
+      pushNotification({
+        kind: "security",
+        title: "Invalid session attempt blocked",
+        message: `${msg}. Receiver: ${sendEmail.trim().toLowerCase()}`,
+      });
       return;
     }
 
@@ -206,6 +213,11 @@ function DashboardPage() {
   const handleFaceVerified = () => {
     if (Math.random() < 0.15) {
       setFlowStep("face-failed");
+      pushNotification({
+        kind: "security",
+        title: "Biometric verification failed",
+        message: "Face authentication did not match. Payment not processed.",
+      });
       return;
     }
     void completePayment();
@@ -238,10 +250,21 @@ function DashboardPage() {
         timestamp: new Date().toISOString(),
       });
       setFlowStep("success");
+      pushNotification({
+        kind: "payment",
+        title: "Payment sent",
+        message: `${result.amount.toFixed(2)} USD sent to ${result.receiverEmail}.`,
+      });
       await loadProfile();
     } catch (err) {
-      setFlowError(err instanceof Error ? err.message : "Payment failed");
+      const msg = err instanceof Error ? err.message : "Payment failed";
+      setFlowError(msg);
       setFlowStep("error");
+      pushNotification({
+        kind: "security",
+        title: "Payment blocked",
+        message: msg,
+      });
     }
   };
 
@@ -262,26 +285,7 @@ function DashboardPage() {
 
   return (
     <div className="min-h-screen">
-      {/* Navbar */}
-      <header className="sticky top-0 z-20 border-b border-glass-border backdrop-blur-xl bg-background/40">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
-          <Logo />
-          <div className="flex items-center gap-3">
-            {profile && (
-              <span className="hidden text-sm text-muted-foreground sm:inline">
-                {profile.name}
-              </span>
-            )}
-            <button
-              onClick={handleLogout}
-              className="inline-flex items-center gap-2 rounded-xl border border-glass-border bg-glass px-3 py-2 text-xs font-medium text-foreground transition-colors hover:bg-white/10"
-            >
-              <LogOut className="h-3.5 w-3.5" />
-              Logout
-            </button>
-          </div>
-        </div>
-      </header>
+      <AppNav userName={profile?.name} />
 
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
         {/* Balance card */}
