@@ -136,13 +136,6 @@ function DashboardPage() {
     return () => clearInterval(id);
   }, [activeCode]);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    localStorage.removeItem("userId");
-    toast.success("Logged out");
-    navigate({ to: "/login" });
-  };
-
   const handleGenerate = async (e: FormEvent) => {
     e.preventDefault();
     setGenerating(true);
@@ -157,6 +150,13 @@ function DashboardPage() {
       setActiveCode({ code: result.code, expiresAt: result.expiresAt });
       setReqAmount("");
       toast.success("Code generated — share it with the sender");
+      pushNotification({
+        kind: "session",
+        title: "New verification code issued",
+        message: `Code ${result.code} is active for 2 minutes${
+          amt ? ` for ${amt.toFixed(2)} USD` : ""
+        }.`,
+      });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to generate code");
     } finally {
