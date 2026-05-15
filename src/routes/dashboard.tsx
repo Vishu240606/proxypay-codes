@@ -250,10 +250,21 @@ function DashboardPage() {
         timestamp: new Date().toISOString(),
       });
       setFlowStep("success");
+      pushNotification({
+        kind: "payment",
+        title: "Payment sent",
+        message: `${result.amount.toFixed(2)} USD sent to ${result.receiverEmail}.`,
+      });
       await loadProfile();
     } catch (err) {
-      setFlowError(err instanceof Error ? err.message : "Payment failed");
+      const msg = err instanceof Error ? err.message : "Payment failed";
+      setFlowError(msg);
       setFlowStep("error");
+      pushNotification({
+        kind: "security",
+        title: "Payment blocked",
+        message: msg,
+      });
     }
   };
 
