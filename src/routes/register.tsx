@@ -64,6 +64,7 @@ function RegisterPage() {
     }
     if (data.user) {
       localStorage.setItem("userId", data.user.id);
+      localStorage.setItem("proxipay.sessionStart", String(Date.now()));
       toast.success("Account created — welcome to ProxiPay!");
       navigate({ to: "/dashboard" });
     }
