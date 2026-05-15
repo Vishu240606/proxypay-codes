@@ -355,18 +355,20 @@ function Row({
   value,
   mono,
   action,
+  valueClass,
 }: {
   label: string;
   value: string;
   mono?: boolean;
   action?: React.ReactNode;
+  valueClass?: string;
 }) {
   return (
     <div className="flex items-center justify-between gap-3">
       <span className="text-xs text-muted-foreground">{label}</span>
       <span className="flex items-center gap-1.5 truncate">
         <span
-          className={`truncate text-foreground ${mono ? "font-mono text-xs" : ""}`}
+          className={`truncate ${valueClass ?? "text-foreground"} ${mono ? "font-mono text-xs" : ""}`}
         >
           {value}
         </span>
