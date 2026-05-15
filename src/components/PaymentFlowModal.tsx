@@ -8,6 +8,8 @@ import {
   AlertTriangle,
   Receipt,
   Copy,
+  Fingerprint,
+  Download,
 } from "lucide-react";
 import { toast } from "sonner";
 
