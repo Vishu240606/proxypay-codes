@@ -263,26 +263,7 @@ function DashboardPage() {
 
   return (
     <div className="min-h-screen">
-      {/* Navbar */}
-      <header className="sticky top-0 z-20 border-b border-glass-border backdrop-blur-xl bg-background/40">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
-          <Logo />
-          <div className="flex items-center gap-3">
-            {profile && (
-              <span className="hidden text-sm text-muted-foreground sm:inline">
-                {profile.name}
-              </span>
-            )}
-            <button
-              onClick={handleLogout}
-              className="inline-flex items-center gap-2 rounded-xl border border-glass-border bg-glass px-3 py-2 text-xs font-medium text-foreground transition-colors hover:bg-white/10"
-            >
-              <LogOut className="h-3.5 w-3.5" />
-              Logout
-            </button>
-          </div>
-        </div>
-      </header>
+      <AppNav userName={profile?.name} />
 
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
         {/* Balance card */}
