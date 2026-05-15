@@ -258,7 +258,7 @@ function SuccessView({
 
   return (
     <div className="animate-fade-in">
-      <div className="mb-6 flex flex-col items-center text-center">
+      <div className="mb-5 flex flex-col items-center text-center">
         <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/15 ring-2 ring-primary animate-scale-in">
           <Check className="h-10 w-10 text-primary" strokeWidth={3} />
         </div>
@@ -266,6 +266,10 @@ function SuccessView({
         <p className="mt-1 text-xs text-muted-foreground">
           Your transfer has been completed securely
         </p>
+        <span className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-[11px] font-semibold text-emerald-400">
+          <Fingerprint className="h-3 w-3" />
+          Biometric verified
+        </span>
       </div>
 
       <div className="rounded-2xl border border-glass-border bg-black/20 p-5">
@@ -298,18 +302,52 @@ function SuccessView({
             label="Timestamp"
             value={new Date(data.timestamp).toLocaleString()}
           />
+          <Row label="Status" value="Completed" valueClass="text-emerald-400" />
         </div>
       </div>
 
-      <button
-        onClick={onDone}
-        className="btn-glow mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold"
-      >
-        <Receipt className="h-4 w-4" />
-        Done
-      </button>
+      <div className="mt-6 grid grid-cols-2 gap-2">
+        <button
+          onClick={() => downloadReceipt(data)}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-glass-border bg-glass px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-white/10"
+        >
+          <Download className="h-4 w-4" />
+          Receipt
+        </button>
+        <button
+          onClick={onDone}
+          className="btn-glow inline-flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold"
+        >
+          <Receipt className="h-4 w-4" />
+          Done
+        </button>
+      </div>
     </div>
   );
+}
+
+function downloadReceipt(data: PaymentSuccessData) {
+  const lines = [
+    "ProxiPay Mini — Payment Receipt",
+    "================================",
+    `Transaction ID : ${data.transactionId}`,
+    `Date           : ${new Date(data.timestamp).toLocaleString()}`,
+    `Amount         : ${fmtMoney(data.amount)}`,
+    `Receiver       : ${data.receiverEmail}`,
+    `Status         : Completed`,
+    `Verification   : Biometric + One-time code`,
+    "",
+    "Thank you for using ProxiPay Mini.",
+  ].join("\n");
+  const blob = new Blob([lines], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `proxipay-receipt-${data.transactionId}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 function Row({
