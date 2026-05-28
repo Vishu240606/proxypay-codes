@@ -442,6 +442,40 @@ function DashboardPage() {
           </div>
         </GlassCard>
 
+        {/* QR Payment quick actions */}
+        <GlassCard
+          className="mb-6 animate-fade-up p-5 sm:p-6"
+          style={{ animationDelay: "30ms" }}
+        >
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <QrCode className="h-4 w-4 text-primary" />
+                <h2 className="text-base font-semibold">Temporary QR Payment</h2>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Encrypted one-time QR sessions · auto-expire in 90 seconds
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:gap-2">
+              <button
+                onClick={openQrModal}
+                className="btn-glow inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold"
+              >
+                <QrCode className="h-4 w-4" />
+                Generate Secure QR
+              </button>
+              <button
+                onClick={openScanner}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-glass-border bg-glass px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-white/10"
+              >
+                <ScanLine className="h-4 w-4" />
+                Scan QR
+              </button>
+            </div>
+          </div>
+        </GlassCard>
+
         <div className="grid gap-6 lg:grid-cols-2">
           {/* Request payment */}
           <GlassCard className="animate-fade-up p-6 sm:p-7" style={{ animationDelay: "60ms" }}>
