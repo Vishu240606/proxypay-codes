@@ -74,20 +74,55 @@ export type Database = {
         }
         Relationships: []
       }
+      qr_sessions: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          receiver_id: string
+          status: string
+          token: string
+          used: boolean
+          used_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          id?: string
+          receiver_id: string
+          status?: string
+          token: string
+          used?: boolean
+          used_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          receiver_id?: string
+          status?: string
+          token?: string
+          used?: boolean
+          used_at?: string | null
+        }
+        Relationships: []
+      }
       transactions: {
         Row: {
           amount: number
           code: string
           created_at: string
           id: string
+          payment_type: string
           receiver_id: string
           sender_id: string
         }
         Insert: {
           amount: number
-          code: string
+          code?: string
           created_at?: string
           id?: string
+          payment_type?: string
           receiver_id: string
           sender_id: string
         }
@@ -96,6 +131,7 @@ export type Database = {
           code?: string
           created_at?: string
           id?: string
+          payment_type?: string
           receiver_id?: string
           sender_id?: string
         }

@@ -200,4 +200,24 @@
   .animate-scan {
     animation: scan 1.8s ease-in-out infinite;
   }
+
+  @keyframes glowPulse {
+    0%, 100% { box-shadow: 0 0 20px oklch(0.78 0.16 215 / 0.4), 0 0 40px oklch(0.78 0.16 215 / 0.2); }
+    50% { box-shadow: 0 0 30px oklch(0.78 0.16 215 / 0.7), 0 0 60px oklch(0.78 0.16 215 / 0.35); }
+  }
+
+  .animate-glow-pulse {
+    animation: glowPulse 2.4s ease-in-out infinite;
+  }
+
+  @keyframes scanLine {
+    0% { top: 0; opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { top: 100%; opacity: 0; }
+  }
+
+  .animate-scan-line {
+    animation: scanLine 2s linear infinite;
+  }
 }

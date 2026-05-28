@@ -2,7 +2,7 @@ import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Wallet, KeyRound, Send, Copy, Check, Clock } from "lucide-react";
+import { Wallet, KeyRound, Send, Copy, Check, Clock, QrCode, ScanLine } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { GlassCard } from "@/components/GlassCard";
 import { GlassInput } from "@/components/GlassInput";
@@ -13,11 +13,22 @@ import {
   type PaymentStep,
   type PaymentSuccessData,
 } from "@/components/PaymentFlowModal";
+import { QrPaymentModal } from "@/components/QrPaymentModal";
+import {
+  QrScannerModal,
+  type ScannedSession,
+  type ScannerPhase,
+} from "@/components/QrScannerModal";
 import {
   requestPaymentCode,
   sendMoney,
   validatePaymentCode,
 } from "@/server/payments.functions";
+import {
+  generateQrSession,
+  scanQrSession,
+  sendMoneyByQr,
+} from "@/server/qr.functions";
 import { useAuthedFn } from "@/hooks/useAuthedFn";
 import { pushNotification } from "@/lib/notifications";
 
@@ -65,6 +76,9 @@ function DashboardPage() {
   const requestFn = useAuthedFn(useServerFn(requestPaymentCode));
   const sendFn = useAuthedFn(useServerFn(sendMoney));
   const validateFn = useAuthedFn(useServerFn(validatePaymentCode));
+  const generateQrFn = useAuthedFn(useServerFn(generateQrSession));
+  const scanQrFn = useAuthedFn(useServerFn(scanQrSession));
+  const sendQrFn = useAuthedFn(useServerFn(sendMoneyByQr));
 
   // Active code state
   const [activeCode, setActiveCode] = useState<{ code: string; expiresAt: string } | null>(null);
@@ -84,6 +98,22 @@ function DashboardPage() {
   const [flowError, setFlowError] = useState<string | undefined>();
   const [successData, setSuccessData] = useState<PaymentSuccessData | undefined>();
   const sending = flowOpen && flowStep !== "success" && flowStep !== "validation-error" && flowStep !== "error";
+
+  // QR payment (receiver) state
+  const [qrModalOpen, setQrModalOpen] = useState(false);
+  const [qrSession, setQrSession] = useState<{ token: string; expiresAt: string; ttlSeconds: number } | null>(null);
+  const [qrGenerating, setQrGenerating] = useState(false);
+
+  // QR scanner (sender) state
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scannerPhase, setScannerPhase] = useState<ScannerPhase>("scanning");
+  const [scannedSession, setScannedSession] = useState<ScannedSession | null>(null);
+  const [scannerError, setScannerError] = useState<string | undefined>();
+  const [scanning, setScanning] = useState(false);
+  const [qrPayAmount, setQrPayAmount] = useState("");
+  // Track active payment source so completePayment knows which backend to call
+  const [paymentSource, setPaymentSource] = useState<"code" | "qr">("code");
+
 
   const loadProfile = async () => {
     const { data: sess } = await supabase.auth.getSession();
@@ -179,6 +209,7 @@ function DashboardPage() {
       return;
     }
 
+    setPaymentSource("code");
     setFlowError(undefined);
     setSuccessData(undefined);
     setFlowStep("validating");
@@ -209,6 +240,87 @@ function DashboardPage() {
     setFlowStep("face-scanning");
   };
 
+  /* ---------------- QR receiver flow ---------------- */
+  const openQrModal = () => {
+    setQrSession(null);
+    setQrModalOpen(true);
+  };
+
+  const handleGenerateQr = async () => {
+    setQrGenerating(true);
+    try {
+      const result = await generateQrFn({ data: undefined as any });
+      setQrSession({
+        token: result.token,
+        expiresAt: result.expiresAt,
+        ttlSeconds: result.ttlSeconds,
+      });
+      pushNotification({
+        kind: "session",
+        title: "Secure QR generated",
+        message: "QR session active for 90 seconds.",
+      });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to generate QR");
+      setQrModalOpen(false);
+    } finally {
+      setQrGenerating(false);
+    }
+  };
+
+  /* ---------------- QR scanner (sender) flow ---------------- */
+  const openScanner = () => {
+    setScannedSession(null);
+    setScannerError(undefined);
+    setScannerPhase("scanning");
+    setQrPayAmount("");
+    setScannerOpen(true);
+  };
+
+  const handleScanSubmit = async (token: string) => {
+    setScanning(true);
+    setScannerError(undefined);
+    try {
+      const result = await scanQrFn({ data: { token } });
+      setScannedSession({ ...result, token });
+      setScannerPhase("scanned");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Invalid QR code";
+      setScannerError(msg);
+      pushNotification({
+        kind: "security",
+        title: "Invalid QR scan blocked",
+        message: msg,
+      });
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  const handleRescan = () => {
+    setScannedSession(null);
+    setScannerPhase("scanning");
+    setScannerError(undefined);
+    setQrPayAmount("");
+  };
+
+  const confirmQrPayment = () => {
+    if (!scannedSession) return;
+    const amt = Number(qrPayAmount);
+    if (isNaN(amt) || amt <= 0) {
+      toast.error("Enter a valid amount");
+      return;
+    }
+    // Move into the unified payment flow modal
+    setPaymentSource("qr");
+    setFlowError(undefined);
+    setSuccessData(undefined);
+    setScannerOpen(false);
+    setFlowStep("face-scanning");
+    setFlowOpen(true);
+  };
+
+
   // Simulated face auth — randomly fails ~15% of the time for realism
   const handleFaceVerified = () => {
     if (Math.random() < 0.15) {
@@ -229,15 +341,24 @@ function DashboardPage() {
 
   const completePayment = async () => {
     setFlowStep("processing");
-    const amt = Number(sendAmt);
     try {
-      const result = await sendFn({
-        data: {
-          receiverEmail: sendEmail.trim().toLowerCase(),
-          amount: amt,
-          code: sendCode.trim().toUpperCase(),
-        },
-      });
+      let result: { amount: number; receiverEmail: string };
+      if (paymentSource === "qr") {
+        if (!scannedSession) throw new Error("QR session lost");
+        const amt = Number(qrPayAmount);
+        result = await sendQrFn({
+          data: { token: scannedSession.token, amount: amt },
+        });
+      } else {
+        const amt = Number(sendAmt);
+        result = await sendFn({
+          data: {
+            receiverEmail: sendEmail.trim().toLowerCase(),
+            amount: amt,
+            code: sendCode.trim().toUpperCase(),
+          },
+        });
+      }
       const txId =
         "TX-" +
         Math.random().toString(36).slice(2, 8).toUpperCase() +
@@ -252,7 +373,7 @@ function DashboardPage() {
       setFlowStep("success");
       pushNotification({
         kind: "payment",
-        title: "Payment sent",
+        title: paymentSource === "qr" ? "QR payment sent" : "Payment sent",
         message: `${result.amount.toFixed(2)} USD sent to ${result.receiverEmail}.`,
       });
       await loadProfile();
@@ -275,10 +396,17 @@ function DashboardPage() {
 
   const finishFlow = () => {
     setFlowOpen(false);
-    setSendEmail("");
-    setSendAmt("");
-    setSendCode("");
+    if (paymentSource === "qr") {
+      setScannedSession(null);
+      setQrPayAmount("");
+      setScannerPhase("scanning");
+    } else {
+      setSendEmail("");
+      setSendAmt("");
+      setSendCode("");
+    }
   };
+
 
   const mm = String(Math.floor(secondsLeft / 60)).padStart(2, "0");
   const ss = String(secondsLeft % 60).padStart(2, "0");
@@ -311,6 +439,40 @@ function DashboardPage() {
             {profile && (
               <p className="mt-2 text-sm text-muted-foreground">{profile.email}</p>
             )}
+          </div>
+        </GlassCard>
+
+        {/* QR Payment quick actions */}
+        <GlassCard
+          className="mb-6 animate-fade-up p-5 sm:p-6"
+          style={{ animationDelay: "30ms" }}
+        >
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <QrCode className="h-4 w-4 text-primary" />
+                <h2 className="text-base font-semibold">Temporary QR Payment</h2>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Encrypted one-time QR sessions · auto-expire in 90 seconds
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:gap-2">
+              <button
+                onClick={openQrModal}
+                className="btn-glow inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold"
+              >
+                <QrCode className="h-4 w-4" />
+                Generate Secure QR
+              </button>
+              <button
+                onClick={openScanner}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-glass-border bg-glass px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-white/10"
+              >
+                <ScanLine className="h-4 w-4" />
+                Scan QR
+              </button>
+            </div>
           </div>
         </GlassCard>
 
@@ -473,6 +635,28 @@ function DashboardPage() {
         onFaceVerified={handleFaceVerified}
         onFaceRetry={handleFaceRetry}
         onDone={finishFlow}
+      />
+
+      <QrPaymentModal
+        open={qrModalOpen}
+        session={qrSession}
+        generating={qrGenerating}
+        onGenerate={handleGenerateQr}
+        onClose={() => setQrModalOpen(false)}
+      />
+
+      <QrScannerModal
+        open={scannerOpen}
+        phase={scannerPhase}
+        scanned={scannedSession}
+        errorMessage={scannerError}
+        scanning={scanning}
+        amount={qrPayAmount}
+        onAmountChange={setQrPayAmount}
+        onClose={() => setScannerOpen(false)}
+        onScanSubmit={handleScanSubmit}
+        onConfirm={confirmQrPayment}
+        onRescan={handleRescan}
       />
     </div>
   );
