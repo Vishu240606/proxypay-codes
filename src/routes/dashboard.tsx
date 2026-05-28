@@ -76,6 +76,9 @@ function DashboardPage() {
   const requestFn = useAuthedFn(useServerFn(requestPaymentCode));
   const sendFn = useAuthedFn(useServerFn(sendMoney));
   const validateFn = useAuthedFn(useServerFn(validatePaymentCode));
+  const generateQrFn = useAuthedFn(useServerFn(generateQrSession));
+  const scanQrFn = useAuthedFn(useServerFn(scanQrSession));
+  const sendQrFn = useAuthedFn(useServerFn(sendMoneyByQr));
 
   // Active code state
   const [activeCode, setActiveCode] = useState<{ code: string; expiresAt: string } | null>(null);
@@ -95,6 +98,22 @@ function DashboardPage() {
   const [flowError, setFlowError] = useState<string | undefined>();
   const [successData, setSuccessData] = useState<PaymentSuccessData | undefined>();
   const sending = flowOpen && flowStep !== "success" && flowStep !== "validation-error" && flowStep !== "error";
+
+  // QR payment (receiver) state
+  const [qrModalOpen, setQrModalOpen] = useState(false);
+  const [qrSession, setQrSession] = useState<{ token: string; expiresAt: string; ttlSeconds: number } | null>(null);
+  const [qrGenerating, setQrGenerating] = useState(false);
+
+  // QR scanner (sender) state
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scannerPhase, setScannerPhase] = useState<ScannerPhase>("scanning");
+  const [scannedSession, setScannedSession] = useState<ScannedSession | null>(null);
+  const [scannerError, setScannerError] = useState<string | undefined>();
+  const [scanning, setScanning] = useState(false);
+  const [qrPayAmount, setQrPayAmount] = useState("");
+  // Track active payment source so completePayment knows which backend to call
+  const [paymentSource, setPaymentSource] = useState<"code" | "qr">("code");
+
 
   const loadProfile = async () => {
     const { data: sess } = await supabase.auth.getSession();
