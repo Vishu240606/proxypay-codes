@@ -249,7 +249,7 @@ function DashboardPage() {
   const handleGenerateQr = async () => {
     setQrGenerating(true);
     try {
-      const result = await generateQrFn({ data: {} });
+      const result = await generateQrFn({ data: undefined as any });
       setQrSession({
         token: result.token,
         expiresAt: result.expiresAt,
