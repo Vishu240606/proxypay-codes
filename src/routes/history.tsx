@@ -226,6 +226,11 @@ function HistoryPage() {
                             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
                             Completed
                           </span>
+                          {t.payment_type === "qr" && (
+                            <span className="rounded-full border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                              QR Payment
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
