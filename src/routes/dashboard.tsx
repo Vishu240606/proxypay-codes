@@ -2,7 +2,7 @@ import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Wallet, KeyRound, Send, Copy, Check, Clock } from "lucide-react";
+import { Wallet, KeyRound, Send, Copy, Check, Clock, QrCode, ScanLine } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { GlassCard } from "@/components/GlassCard";
 import { GlassInput } from "@/components/GlassInput";
@@ -13,11 +13,22 @@ import {
   type PaymentStep,
   type PaymentSuccessData,
 } from "@/components/PaymentFlowModal";
+import { QrPaymentModal } from "@/components/QrPaymentModal";
+import {
+  QrScannerModal,
+  type ScannedSession,
+  type ScannerPhase,
+} from "@/components/QrScannerModal";
 import {
   requestPaymentCode,
   sendMoney,
   validatePaymentCode,
 } from "@/server/payments.functions";
+import {
+  generateQrSession,
+  scanQrSession,
+  sendMoneyByQr,
+} from "@/server/qr.functions";
 import { useAuthedFn } from "@/hooks/useAuthedFn";
 import { pushNotification } from "@/lib/notifications";
 
