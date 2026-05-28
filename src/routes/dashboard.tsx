@@ -209,6 +209,7 @@ function DashboardPage() {
       return;
     }
 
+    setPaymentSource("code");
     setFlowError(undefined);
     setSuccessData(undefined);
     setFlowStep("validating");
@@ -238,6 +239,87 @@ function DashboardPage() {
     // Step 2: face auth
     setFlowStep("face-scanning");
   };
+
+  /* ---------------- QR receiver flow ---------------- */
+  const openQrModal = () => {
+    setQrSession(null);
+    setQrModalOpen(true);
+  };
+
+  const handleGenerateQr = async () => {
+    setQrGenerating(true);
+    try {
+      const result = await generateQrFn({ data: {} });
+      setQrSession({
+        token: result.token,
+        expiresAt: result.expiresAt,
+        ttlSeconds: result.ttlSeconds,
+      });
+      pushNotification({
+        kind: "session",
+        title: "Secure QR generated",
+        message: "QR session active for 90 seconds.",
+      });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to generate QR");
+      setQrModalOpen(false);
+    } finally {
+      setQrGenerating(false);
+    }
+  };
+
+  /* ---------------- QR scanner (sender) flow ---------------- */
+  const openScanner = () => {
+    setScannedSession(null);
+    setScannerError(undefined);
+    setScannerPhase("scanning");
+    setQrPayAmount("");
+    setScannerOpen(true);
+  };
+
+  const handleScanSubmit = async (token: string) => {
+    setScanning(true);
+    setScannerError(undefined);
+    try {
+      const result = await scanQrFn({ data: { token } });
+      setScannedSession({ ...result, token });
+      setScannerPhase("scanned");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Invalid QR code";
+      setScannerError(msg);
+      pushNotification({
+        kind: "security",
+        title: "Invalid QR scan blocked",
+        message: msg,
+      });
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  const handleRescan = () => {
+    setScannedSession(null);
+    setScannerPhase("scanning");
+    setScannerError(undefined);
+    setQrPayAmount("");
+  };
+
+  const confirmQrPayment = () => {
+    if (!scannedSession) return;
+    const amt = Number(qrPayAmount);
+    if (isNaN(amt) || amt <= 0) {
+      toast.error("Enter a valid amount");
+      return;
+    }
+    // Move into the unified payment flow modal
+    setPaymentSource("qr");
+    setFlowError(undefined);
+    setSuccessData(undefined);
+    setScannerOpen(false);
+    setFlowStep("face-scanning");
+    setFlowOpen(true);
+  };
+
 
   // Simulated face auth — randomly fails ~15% of the time for realism
   const handleFaceVerified = () => {
