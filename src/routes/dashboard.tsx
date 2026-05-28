@@ -341,15 +341,24 @@ function DashboardPage() {
 
   const completePayment = async () => {
     setFlowStep("processing");
-    const amt = Number(sendAmt);
     try {
-      const result = await sendFn({
-        data: {
-          receiverEmail: sendEmail.trim().toLowerCase(),
-          amount: amt,
-          code: sendCode.trim().toUpperCase(),
-        },
-      });
+      let result: { amount: number; receiverEmail: string };
+      if (paymentSource === "qr") {
+        if (!scannedSession) throw new Error("QR session lost");
+        const amt = Number(qrPayAmount);
+        result = await sendQrFn({
+          data: { token: scannedSession.token, amount: amt },
+        });
+      } else {
+        const amt = Number(sendAmt);
+        result = await sendFn({
+          data: {
+            receiverEmail: sendEmail.trim().toLowerCase(),
+            amount: amt,
+            code: sendCode.trim().toUpperCase(),
+          },
+        });
+      }
       const txId =
         "TX-" +
         Math.random().toString(36).slice(2, 8).toUpperCase() +
@@ -364,7 +373,7 @@ function DashboardPage() {
       setFlowStep("success");
       pushNotification({
         kind: "payment",
-        title: "Payment sent",
+        title: paymentSource === "qr" ? "QR payment sent" : "Payment sent",
         message: `${result.amount.toFixed(2)} USD sent to ${result.receiverEmail}.`,
       });
       await loadProfile();
@@ -387,10 +396,17 @@ function DashboardPage() {
 
   const finishFlow = () => {
     setFlowOpen(false);
-    setSendEmail("");
-    setSendAmt("");
-    setSendCode("");
+    if (paymentSource === "qr") {
+      setScannedSession(null);
+      setQrPayAmount("");
+      setScannerPhase("scanning");
+    } else {
+      setSendEmail("");
+      setSendAmt("");
+      setSendCode("");
+    }
   };
+
 
   const mm = String(Math.floor(secondsLeft / 60)).padStart(2, "0");
   const ss = String(secondsLeft % 60).padStart(2, "0");
