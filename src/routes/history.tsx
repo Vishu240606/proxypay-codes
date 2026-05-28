@@ -13,6 +13,7 @@ interface Transaction {
   amount: number;
   code: string;
   created_at: string;
+  payment_type?: string;
   sender_email?: string;
   receiver_email?: string;
 }
