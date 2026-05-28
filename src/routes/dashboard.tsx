@@ -602,6 +602,28 @@ function DashboardPage() {
         onFaceRetry={handleFaceRetry}
         onDone={finishFlow}
       />
+
+      <QrPaymentModal
+        open={qrModalOpen}
+        session={qrSession}
+        generating={qrGenerating}
+        onGenerate={handleGenerateQr}
+        onClose={() => setQrModalOpen(false)}
+      />
+
+      <QrScannerModal
+        open={scannerOpen}
+        phase={scannerPhase}
+        scanned={scannedSession}
+        errorMessage={scannerError}
+        scanning={scanning}
+        amount={qrPayAmount}
+        onAmountChange={setQrPayAmount}
+        onClose={() => setScannerOpen(false)}
+        onScanSubmit={handleScanSubmit}
+        onConfirm={confirmQrPayment}
+        onRescan={handleRescan}
+      />
     </div>
   );
 }
