@@ -23,7 +23,7 @@ function friendlyQrError(msg: string): string {
 export interface ScannedSession {
   sessionId: string;
   receiverId: string;
-  receiverEmail: string;
+  receiverUserId: string;
   receiverName: string;
   token: string;
   expiresAt: string;
