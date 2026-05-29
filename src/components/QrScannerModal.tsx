@@ -11,6 +11,15 @@ import {
 import { GlassInput } from "@/components/GlassInput";
 import { CameraQrScanner } from "@/components/CameraQrScanner";
 
+function friendlyQrError(msg: string): string {
+  const m = msg.toLowerCase();
+  if (m.includes("expired")) return "QR Session Expired";
+  if (m.includes("already used")) return "This QR has already been used";
+  if (m.includes("own qr")) return "You cannot pay your own QR code";
+  if (m.includes("invalid qr")) return "Invalid QR code";
+  return msg;
+}
+
 export interface ScannedSession {
   sessionId: string;
   receiverId: string;
