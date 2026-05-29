@@ -100,30 +100,14 @@ export function QrScannerModal({
               </p>
             </div>
 
-            {/* Scanner viewport */}
-            <div className="relative mx-auto aspect-square w-64 overflow-hidden rounded-2xl border border-glass-border bg-black/60">
-              <div
-                className="absolute inset-0 opacity-50"
-                style={{
-                  background:
-                    "radial-gradient(circle at 50% 50%, color-mix(in oklab, var(--primary) 25%, transparent), transparent 70%)",
+            {/* Live camera scanner viewport */}
+            <div className="relative mx-auto aspect-square w-64 overflow-hidden rounded-2xl border border-glass-border bg-black/80">
+              <CameraQrScanner
+                paused={scanning}
+                onDetected={(token) => {
+                  if (!scanning) onScanSubmit(token);
                 }}
               />
-              {scanning ? (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                </div>
-              ) : (
-                <>
-                  <ScanLine className="absolute left-1/2 top-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2 text-primary/30" />
-                  <div className="pointer-events-none absolute inset-x-6 h-0.5 animate-scan-line bg-primary shadow-[0_0_16px_4px_color-mix(in_oklab,var(--primary)_60%,transparent)]" />
-                </>
-              )}
-              {/* Corner brackets */}
-              <span className="absolute left-3 top-3 h-6 w-6 rounded-tl-lg border-l-2 border-t-2 border-primary" />
-              <span className="absolute right-3 top-3 h-6 w-6 rounded-tr-lg border-r-2 border-t-2 border-primary" />
-              <span className="absolute bottom-3 left-3 h-6 w-6 rounded-bl-lg border-b-2 border-l-2 border-primary" />
-              <span className="absolute bottom-3 right-3 h-6 w-6 rounded-br-lg border-b-2 border-r-2 border-primary" />
             </div>
 
             <form
