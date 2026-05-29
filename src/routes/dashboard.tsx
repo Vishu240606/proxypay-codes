@@ -146,6 +146,7 @@ function DashboardPage() {
     if (p) {
       setProfile({
         id: p.id,
+        user_id: p.user_id,
         name: p.name,
         email: p.email,
         balance: Number(p.balance),
