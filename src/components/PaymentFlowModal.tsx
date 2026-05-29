@@ -283,7 +283,7 @@ function SuccessView({
         </div>
 
         <div className="mt-5 space-y-3 text-sm">
-          <Row label="To" value={data.receiverEmail} />
+          <Row label="To" value={`@${data.receiverHandle}`} mono />
           <Row
             label="Transaction ID"
             value={data.transactionId}
