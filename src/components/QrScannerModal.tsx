@@ -9,6 +9,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { GlassInput } from "@/components/GlassInput";
+import { CameraQrScanner } from "@/components/CameraQrScanner";
 
 export interface ScannedSession {
   sessionId: string;
