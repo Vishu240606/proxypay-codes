@@ -76,7 +76,7 @@ export const scanQrSession = createServerFn({ method: "POST" })
 
     const { data: receiver } = await supabaseAdmin
       .from("profiles")
-      .select("id, email, name")
+      .select("id, user_id, name")
       .eq("id", session.receiver_id)
       .single();
 
@@ -85,7 +85,7 @@ export const scanQrSession = createServerFn({ method: "POST" })
     return {
       sessionId: session.id,
       receiverId: receiver.id,
-      receiverEmail: receiver.email,
+      receiverUserId: receiver.user_id,
       receiverName: receiver.name,
       expiresAt: session.expires_at,
     };
