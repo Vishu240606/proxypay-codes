@@ -6,6 +6,15 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 const CODE_TTL_SECONDS = 120; // 2 minutes
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no ambiguous chars
 
+const USER_ID_RE = /^[a-z0-9](?:[a-z0-9_]{0,30}[a-z0-9])?$/;
+const userIdSchema = z
+  .string()
+  .trim()
+  .min(2)
+  .max(32)
+  .transform((v) => v.toLowerCase())
+  .refine((v) => USER_ID_RE.test(v), { message: "Invalid User ID format" });
+
 function generateCode(): string {
   let out = "PX";
   for (let i = 0; i < 6; i++) {
@@ -25,7 +34,6 @@ export const requestPaymentCode = createServerFn({ method: "POST" })
     const { userId } = context;
     const expiresAt = new Date(Date.now() + CODE_TTL_SECONDS * 1000).toISOString();
 
-    // Try a few times to avoid (very unlikely) collision
     let lastError: unknown = null;
     for (let attempt = 0; attempt < 5; attempt++) {
       const code = generateCode();
@@ -41,21 +49,42 @@ export const requestPaymentCode = createServerFn({ method: "POST" })
         .single();
 
       if (!error && row) {
-        return {
-          code: row.code,
-          expiresAt: row.expires_at,
-          amount: row.amount,
-        };
+        return { code: row.code, expiresAt: row.expires_at, amount: row.amount };
       }
       lastError = error;
     }
     throw new Error(
-      `Failed to generate code: ${lastError instanceof Error ? lastError.message : "unknown"}`
+      `Failed to generate code: ${lastError instanceof Error ? lastError.message : "unknown"}`,
     );
   });
 
+/** Look up a receiver by their unique User ID, returning a safe public profile. */
+const LookupSchema = z.object({ receiverUserId: userIdSchema });
+
+export const lookupReceiver = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => LookupSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const { data: receiver } = await supabaseAdmin
+      .from("profiles")
+      .select("id, name, user_id")
+      .eq("user_id", data.receiverUserId)
+      .maybeSingle();
+
+    if (!receiver) throw new Error("User ID not found");
+    if (receiver.id === context.userId) {
+      throw new Error("You cannot send money to yourself");
+    }
+
+    return {
+      id: receiver.id,
+      name: receiver.name,
+      userId: receiver.user_id,
+    };
+  });
+
 const ValidateSchema = z.object({
-  receiverEmail: z.string().email().max(255),
+  receiverUserId: userIdSchema,
   amount: z.number().positive().max(1_000_000),
   code: z.string().min(4).max(20).trim(),
 });
@@ -80,11 +109,11 @@ export const validatePaymentCode = createServerFn({ method: "POST" })
 
     const { data: receiver } = await supabaseAdmin
       .from("profiles")
-      .select("id, email")
-      .eq("email", data.receiverEmail.toLowerCase())
+      .select("id, user_id")
+      .eq("user_id", data.receiverUserId)
       .maybeSingle();
 
-    if (!receiver) throw new Error("Receiver not found");
+    if (!receiver) throw new Error("User ID not found");
     if (receiver.id !== codeRow.receiver_id) {
       throw new Error("Code does not match receiver");
     }
@@ -109,7 +138,7 @@ export const validatePaymentCode = createServerFn({ method: "POST" })
   });
 
 const SendSchema = z.object({
-  receiverEmail: z.string().email().max(255),
+  receiverUserId: userIdSchema,
   amount: z.number().positive().max(1_000_000),
   code: z.string().min(4).max(20).trim(),
 });
@@ -120,7 +149,6 @@ export const sendMoney = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const senderId = context.userId;
 
-    // 1. Look up code (admin client to bypass RLS — code itself is the secret)
     const { data: codeRow, error: codeErr } = await supabaseAdmin
       .from("payment_codes")
       .select("*")
@@ -134,14 +162,13 @@ export const sendMoney = createServerFn({ method: "POST" })
       throw new Error("Invalid or expired code");
     }
 
-    // 2. Resolve receiver by email
     const { data: receiver, error: rErr } = await supabaseAdmin
       .from("profiles")
-      .select("id, email, balance")
-      .eq("email", data.receiverEmail.toLowerCase())
+      .select("id, user_id, balance")
+      .eq("user_id", data.receiverUserId)
       .maybeSingle();
 
-    if (rErr || !receiver) throw new Error("Receiver not found");
+    if (rErr || !receiver) throw new Error("User ID not found");
     if (receiver.id !== codeRow.receiver_id) {
       throw new Error("Code does not match receiver");
     }
@@ -149,12 +176,10 @@ export const sendMoney = createServerFn({ method: "POST" })
       throw new Error("Cannot send money to yourself");
     }
 
-    // 3. If code has a fixed amount, enforce it
     if (codeRow.amount != null && Number(codeRow.amount) !== data.amount) {
       throw new Error(`Amount must be exactly $${Number(codeRow.amount).toFixed(2)}`);
     }
 
-    // 4. Check sender balance
     const { data: sender, error: sErr } = await supabaseAdmin
       .from("profiles")
       .select("id, balance")
@@ -164,7 +189,6 @@ export const sendMoney = createServerFn({ method: "POST" })
     if (sErr || !sender) throw new Error("Sender profile not found");
     if (Number(sender.balance) < data.amount) throw new Error("Insufficient balance");
 
-    // 5. Mark code used FIRST (idempotency guard) — only succeeds if still unused
     const { data: claimed, error: claimErr } = await supabaseAdmin
       .from("payment_codes")
       .update({ used: true, used_at: new Date().toISOString() })
@@ -175,7 +199,6 @@ export const sendMoney = createServerFn({ method: "POST" })
 
     if (claimErr || !claimed) throw new Error("Code already used");
 
-    // 6. Transfer balances
     const newSenderBal = Number(sender.balance) - data.amount;
     const newReceiverBal = Number(receiver.balance) + data.amount;
 
@@ -190,12 +213,10 @@ export const sendMoney = createServerFn({ method: "POST" })
       .update({ balance: newReceiverBal })
       .eq("id", receiver.id);
     if (u2) {
-      // rollback sender
       await supabaseAdmin.from("profiles").update({ balance: sender.balance }).eq("id", senderId);
       throw new Error("Transfer failed");
     }
 
-    // 7. Log transaction
     await supabaseAdmin.from("transactions").insert({
       sender_id: senderId,
       receiver_id: receiver.id,
@@ -207,6 +228,6 @@ export const sendMoney = createServerFn({ method: "POST" })
       success: true,
       newBalance: newSenderBal,
       amount: data.amount,
-      receiverEmail: receiver.email,
+      receiverUserId: receiver.user_id,
     };
   });
