@@ -23,6 +23,7 @@ import {
   requestPaymentCode,
   sendMoney,
   validatePaymentCode,
+  lookupReceiver,
 } from "@/server/payments.functions";
 import {
   generateQrSession,
@@ -34,9 +35,16 @@ import { pushNotification } from "@/lib/notifications";
 
 interface Profile {
   id: string;
+  user_id: string;
   name: string;
   email: string;
   balance: number;
+}
+
+interface ReceiverInfo {
+  id: string;
+  name: string;
+  userId: string;
 }
 
 interface Transaction {
