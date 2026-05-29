@@ -128,7 +128,7 @@ export function QrScannerModal({
               {errorMessage && (
                 <div className="flex items-start gap-2 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
                   <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                  <span>{errorMessage}</span>
+                  <span>{friendlyQrError(errorMessage)}</span>
                 </div>
               )}
               <button
