@@ -23,6 +23,7 @@ import {
   requestPaymentCode,
   sendMoney,
   validatePaymentCode,
+  lookupReceiver,
 } from "@/server/payments.functions";
 import {
   generateQrSession,
@@ -34,9 +35,16 @@ import { pushNotification } from "@/lib/notifications";
 
 interface Profile {
   id: string;
+  user_id: string;
   name: string;
   email: string;
   balance: number;
+}
+
+interface ReceiverInfo {
+  id: string;
+  name: string;
+  userId: string;
 }
 
 interface Transaction {
@@ -76,6 +84,7 @@ function DashboardPage() {
   const requestFn = useAuthedFn(useServerFn(requestPaymentCode));
   const sendFn = useAuthedFn(useServerFn(sendMoney));
   const validateFn = useAuthedFn(useServerFn(validatePaymentCode));
+  const lookupFn = useAuthedFn(useServerFn(lookupReceiver));
   const generateQrFn = useAuthedFn(useServerFn(generateQrSession));
   const scanQrFn = useAuthedFn(useServerFn(scanQrSession));
   const sendQrFn = useAuthedFn(useServerFn(sendMoneyByQr));
@@ -86,11 +95,15 @@ function DashboardPage() {
   const [reqAmount, setReqAmount] = useState("");
   const [generating, setGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copiedMyId, setCopiedMyId] = useState(false);
 
-  // Send form
-  const [sendEmail, setSendEmail] = useState("");
+  // Send form (User ID-based)
+  const [sendUserId, setSendUserId] = useState("");
   const [sendAmt, setSendAmt] = useState("");
   const [sendCode, setSendCode] = useState("");
+  const [receiverInfo, setReceiverInfo] = useState<ReceiverInfo | null>(null);
+  const [receiverError, setReceiverError] = useState<string | null>(null);
+  const [lookingUp, setLookingUp] = useState(false);
 
   // Payment flow
   const [flowOpen, setFlowOpen] = useState(false);
@@ -133,6 +146,7 @@ function DashboardPage() {
     if (p) {
       setProfile({
         id: p.id,
+        user_id: p.user_id,
         name: p.name,
         email: p.email,
         balance: Number(p.balance),
@@ -201,10 +215,30 @@ function DashboardPage() {
     setTimeout(() => setCopied(false), 1500);
   };
 
+  const handleLookupReceiver = async (raw: string) => {
+    const handle = raw.trim().toLowerCase();
+    setReceiverError(null);
+    setReceiverInfo(null);
+    if (!handle) return;
+    setLookingUp(true);
+    try {
+      const r = await lookupFn({ data: { receiverUserId: handle } });
+      setReceiverInfo(r);
+    } catch (err) {
+      setReceiverError(err instanceof Error ? err.message : "User ID not found");
+    } finally {
+      setLookingUp(false);
+    }
+  };
+
   const startPaymentFlow = async (e: FormEvent) => {
     e.preventDefault();
     const amt = Number(sendAmt);
-    if (!sendEmail || !sendCode || isNaN(amt) || amt <= 0) {
+    if (!receiverInfo) {
+      toast.error("Verify the receiver User ID first");
+      return;
+    }
+    if (!sendCode || isNaN(amt) || amt <= 0) {
       toast.error("Fill in all fields with a valid amount");
       return;
     }
@@ -215,11 +249,10 @@ function DashboardPage() {
     setFlowStep("validating");
     setFlowOpen(true);
 
-    // Step 1: validate code
     try {
       await validateFn({
         data: {
-          receiverEmail: sendEmail.trim().toLowerCase(),
+          receiverUserId: receiverInfo.userId,
           amount: amt,
           code: sendCode.trim().toUpperCase(),
         },
@@ -231,12 +264,11 @@ function DashboardPage() {
       pushNotification({
         kind: "security",
         title: "Invalid session attempt blocked",
-        message: `${msg}. Receiver: ${sendEmail.trim().toLowerCase()}`,
+        message: `${msg}. Receiver: @${receiverInfo.userId}`,
       });
       return;
     }
 
-    // Step 2: face auth
     setFlowStep("face-scanning");
   };
 
@@ -342,7 +374,7 @@ function DashboardPage() {
   const completePayment = async () => {
     setFlowStep("processing");
     try {
-      let result: { amount: number; receiverEmail: string };
+      let result: { amount: number; receiverUserId: string };
       if (paymentSource === "qr") {
         if (!scannedSession) throw new Error("QR session lost");
         const amt = Number(qrPayAmount);
@@ -350,10 +382,11 @@ function DashboardPage() {
           data: { token: scannedSession.token, amount: amt },
         });
       } else {
+        if (!receiverInfo) throw new Error("Receiver not verified");
         const amt = Number(sendAmt);
         result = await sendFn({
           data: {
-            receiverEmail: sendEmail.trim().toLowerCase(),
+            receiverUserId: receiverInfo.userId,
             amount: amt,
             code: sendCode.trim().toUpperCase(),
           },
@@ -366,7 +399,7 @@ function DashboardPage() {
         Date.now().toString(36).toUpperCase();
       setSuccessData({
         amount: result.amount,
-        receiverEmail: result.receiverEmail,
+        receiverHandle: result.receiverUserId,
         transactionId: txId,
         timestamp: new Date().toISOString(),
       });
@@ -374,7 +407,7 @@ function DashboardPage() {
       pushNotification({
         kind: "payment",
         title: paymentSource === "qr" ? "QR payment sent" : "Payment sent",
-        message: `${result.amount.toFixed(2)} USD sent to ${result.receiverEmail}.`,
+        message: `${result.amount.toFixed(2)} USD sent to @${result.receiverUserId}.`,
       });
       await loadProfile();
     } catch (err) {
@@ -401,11 +434,22 @@ function DashboardPage() {
       setQrPayAmount("");
       setScannerPhase("scanning");
     } else {
-      setSendEmail("");
+      setSendUserId("");
+      setReceiverInfo(null);
+      setReceiverError(null);
       setSendAmt("");
       setSendCode("");
     }
   };
+
+  const handleCopyMyId = async () => {
+    if (!profile?.user_id) return;
+    await navigator.clipboard.writeText(profile.user_id);
+    setCopiedMyId(true);
+    toast.success("User ID copied");
+    setTimeout(() => setCopiedMyId(false), 1500);
+  };
+
 
 
   const mm = String(Math.floor(secondsLeft / 60)).padStart(2, "0");

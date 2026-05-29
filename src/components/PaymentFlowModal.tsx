@@ -24,7 +24,7 @@ export type PaymentStep =
 
 export interface PaymentSuccessData {
   amount: number;
-  receiverEmail: string;
+  receiverHandle: string;
   transactionId: string;
   timestamp: string;
 }
@@ -283,7 +283,7 @@ function SuccessView({
         </div>
 
         <div className="mt-5 space-y-3 text-sm">
-          <Row label="To" value={data.receiverEmail} />
+          <Row label="To" value={`@${data.receiverHandle}`} mono />
           <Row
             label="Transaction ID"
             value={data.transactionId}
@@ -333,7 +333,7 @@ function downloadReceipt(data: PaymentSuccessData) {
     `Transaction ID : ${data.transactionId}`,
     `Date           : ${new Date(data.timestamp).toLocaleString()}`,
     `Amount         : ${fmtMoney(data.amount)}`,
-    `Receiver       : ${data.receiverEmail}`,
+    `Receiver       : @${data.receiverHandle}`,
     `Status         : Completed`,
     `Verification   : Biometric + One-time code`,
     "",
