@@ -24,7 +24,7 @@ export type PaymentStep =
 
 export interface PaymentSuccessData {
   amount: number;
-  receiverEmail: string;
+  receiverHandle: string;
   transactionId: string;
   timestamp: string;
 }
