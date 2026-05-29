@@ -84,6 +84,7 @@ function DashboardPage() {
   const requestFn = useAuthedFn(useServerFn(requestPaymentCode));
   const sendFn = useAuthedFn(useServerFn(sendMoney));
   const validateFn = useAuthedFn(useServerFn(validatePaymentCode));
+  const lookupFn = useAuthedFn(useServerFn(lookupReceiver));
   const generateQrFn = useAuthedFn(useServerFn(generateQrSession));
   const scanQrFn = useAuthedFn(useServerFn(scanQrSession));
   const sendQrFn = useAuthedFn(useServerFn(sendMoneyByQr));
@@ -94,11 +95,15 @@ function DashboardPage() {
   const [reqAmount, setReqAmount] = useState("");
   const [generating, setGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copiedMyId, setCopiedMyId] = useState(false);
 
-  // Send form
-  const [sendEmail, setSendEmail] = useState("");
+  // Send form (User ID-based)
+  const [sendUserId, setSendUserId] = useState("");
   const [sendAmt, setSendAmt] = useState("");
   const [sendCode, setSendCode] = useState("");
+  const [receiverInfo, setReceiverInfo] = useState<ReceiverInfo | null>(null);
+  const [receiverError, setReceiverError] = useState<string | null>(null);
+  const [lookingUp, setLookingUp] = useState(false);
 
   // Payment flow
   const [flowOpen, setFlowOpen] = useState(false);
