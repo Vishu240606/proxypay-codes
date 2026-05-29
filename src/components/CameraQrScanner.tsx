@@ -77,7 +77,9 @@ export function CameraQrScanner({ onDetected, paused }: Props) {
         inst
           .stop()
           .catch(() => {})
-          .finally(() => inst.clear().catch(() => {}));
+          .finally(() => {
+            try { inst.clear(); } catch { /* noop */ }
+          });
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
