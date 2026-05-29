@@ -374,7 +374,7 @@ function DashboardPage() {
   const completePayment = async () => {
     setFlowStep("processing");
     try {
-      let result: { amount: number; receiverEmail: string };
+      let result: { amount: number; receiverUserId: string };
       if (paymentSource === "qr") {
         if (!scannedSession) throw new Error("QR session lost");
         const amt = Number(qrPayAmount);
@@ -382,10 +382,11 @@ function DashboardPage() {
           data: { token: scannedSession.token, amount: amt },
         });
       } else {
+        if (!receiverInfo) throw new Error("Receiver not verified");
         const amt = Number(sendAmt);
         result = await sendFn({
           data: {
-            receiverEmail: sendEmail.trim().toLowerCase(),
+            receiverUserId: receiverInfo.userId,
             amount: amt,
             code: sendCode.trim().toUpperCase(),
           },
@@ -398,7 +399,7 @@ function DashboardPage() {
         Date.now().toString(36).toUpperCase();
       setSuccessData({
         amount: result.amount,
-        receiverEmail: result.receiverEmail,
+        receiverHandle: result.receiverUserId,
         transactionId: txId,
         timestamp: new Date().toISOString(),
       });
@@ -406,7 +407,7 @@ function DashboardPage() {
       pushNotification({
         kind: "payment",
         title: paymentSource === "qr" ? "QR payment sent" : "Payment sent",
-        message: `${result.amount.toFixed(2)} USD sent to ${result.receiverEmail}.`,
+        message: `${result.amount.toFixed(2)} USD sent to @${result.receiverUserId}.`,
       });
       await loadProfile();
     } catch (err) {
@@ -433,11 +434,22 @@ function DashboardPage() {
       setQrPayAmount("");
       setScannerPhase("scanning");
     } else {
-      setSendEmail("");
+      setSendUserId("");
+      setReceiverInfo(null);
+      setReceiverError(null);
       setSendAmt("");
       setSendCode("");
     }
   };
+
+  const handleCopyMyId = async () => {
+    if (!profile?.user_id) return;
+    await navigator.clipboard.writeText(profile.user_id);
+    setCopiedMyId(true);
+    toast.success("User ID copied");
+    setTimeout(() => setCopiedMyId(false), 1500);
+  };
+
 
 
   const mm = String(Math.floor(secondsLeft / 60)).padStart(2, "0");
