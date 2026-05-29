@@ -180,8 +180,16 @@ export function QrScannerModal({
                   <span className="truncate font-medium">{scanned.receiverName}</span>
                 </div>
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-xs text-muted-foreground">Email</span>
-                  <span className="truncate text-xs">{scanned.receiverEmail}</span>
+                  <span className="text-xs text-muted-foreground">User ID</span>
+                  <span className="truncate font-mono text-xs text-primary">
+                    @{scanned.receiverUserId}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs text-muted-foreground">Status</span>
+                  <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">
+                    <CheckCircle2 className="h-3 w-3" /> Account verified
+                  </span>
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-xs text-muted-foreground">Session expires</span>
