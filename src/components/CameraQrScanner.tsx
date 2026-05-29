@@ -54,8 +54,8 @@ export function CameraQrScanner({ onDetected, paused }: Props) {
           },
         );
         if (cancelled) {
-          await instance.stop().catch(() => {});
-          await instance.clear().catch(() => {});
+          try { await instance.stop(); } catch { /* noop */ }
+          try { instance.clear(); } catch { /* noop */ }
           return;
         }
         setStatus("running");
