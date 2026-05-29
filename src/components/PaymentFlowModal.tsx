@@ -333,7 +333,7 @@ function downloadReceipt(data: PaymentSuccessData) {
     `Transaction ID : ${data.transactionId}`,
     `Date           : ${new Date(data.timestamp).toLocaleString()}`,
     `Amount         : ${fmtMoney(data.amount)}`,
-    `Receiver       : ${data.receiverEmail}`,
+    `Receiver       : @${data.receiverHandle}`,
     `Status         : Completed`,
     `Verification   : Biometric + One-time code`,
     "",
