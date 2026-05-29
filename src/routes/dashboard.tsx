@@ -215,10 +215,30 @@ function DashboardPage() {
     setTimeout(() => setCopied(false), 1500);
   };
 
+  const handleLookupReceiver = async (raw: string) => {
+    const handle = raw.trim().toLowerCase();
+    setReceiverError(null);
+    setReceiverInfo(null);
+    if (!handle) return;
+    setLookingUp(true);
+    try {
+      const r = await lookupFn({ data: { receiverUserId: handle } });
+      setReceiverInfo(r);
+    } catch (err) {
+      setReceiverError(err instanceof Error ? err.message : "User ID not found");
+    } finally {
+      setLookingUp(false);
+    }
+  };
+
   const startPaymentFlow = async (e: FormEvent) => {
     e.preventDefault();
     const amt = Number(sendAmt);
-    if (!sendEmail || !sendCode || isNaN(amt) || amt <= 0) {
+    if (!receiverInfo) {
+      toast.error("Verify the receiver User ID first");
+      return;
+    }
+    if (!sendCode || isNaN(amt) || amt <= 0) {
       toast.error("Fill in all fields with a valid amount");
       return;
     }
@@ -229,11 +249,10 @@ function DashboardPage() {
     setFlowStep("validating");
     setFlowOpen(true);
 
-    // Step 1: validate code
     try {
       await validateFn({
         data: {
-          receiverEmail: sendEmail.trim().toLowerCase(),
+          receiverUserId: receiverInfo.userId,
           amount: amt,
           code: sendCode.trim().toUpperCase(),
         },
@@ -245,12 +264,11 @@ function DashboardPage() {
       pushNotification({
         kind: "security",
         title: "Invalid session attempt blocked",
-        message: `${msg}. Receiver: ${sendEmail.trim().toLowerCase()}`,
+        message: `${msg}. Receiver: @${receiverInfo.userId}`,
       });
       return;
     }
 
-    // Step 2: face auth
     setFlowStep("face-scanning");
   };
 
