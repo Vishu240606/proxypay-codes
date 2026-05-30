@@ -596,16 +596,35 @@ function DashboardPage() {
               <h2 className="text-base font-semibold">Send money</h2>
             </div>
             <form onSubmit={startPaymentFlow} className="space-y-4">
-              <GlassInput
-                type="email"
-                name="receiver"
-                label="Receiver email"
-                placeholder="receiver@example.com"
-                value={sendEmail}
-                onChange={(e) => setSendEmail(e.target.value)}
-                disabled={sending}
-                required
-              />
+              <div className="space-y-1">
+                <GlassInput
+                  name="receiver"
+                  label="Receiver User ID"
+                  placeholder="username_123"
+                  value={sendUserId}
+                  onChange={(e) => {
+                    setSendUserId(e.target.value);
+                    setReceiverInfo(null);
+                    setReceiverError(null);
+                  }}
+                  onBlur={(e) => handleLookupReceiver(e.target.value)}
+                  disabled={sending}
+                  required
+                  className="font-mono"
+                />
+                {lookingUp && (
+                  <p className="text-xs text-muted-foreground">Verifying…</p>
+                )}
+                {receiverInfo && (
+                  <p className="text-xs text-primary">
+                    ✓ @{receiverInfo.userId}
+                    {receiverInfo.name ? ` · ${receiverInfo.name}` : ""}
+                  </p>
+                )}
+                {receiverError && (
+                  <p className="text-xs text-destructive">{receiverError}</p>
+                )}
+              </div>
               <GlassInput
                 type="number"
                 step="0.01"
