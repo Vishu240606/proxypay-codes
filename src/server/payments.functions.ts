@@ -70,20 +70,28 @@ export const requestPaymentCode = createServerFn({ method: "POST" })
     );
   });
 
-/** Look up a receiver by their unique User ID, returning a safe public profile. */
-const LookupSchema = z.object({ receiverUserId: userIdSchema });
+/** Look up a receiver by their User ID OR registered email. */
+const LookupSchema = z.object({ receiverUserId: receiverHandleSchema });
 
 export const lookupReceiver = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => LookupSchema.parse(input))
+  .inputValidator((input: unknown) => {
+    const parsed = LookupSchema.safeParse(input);
+    if (!parsed.success) {
+      throw new Error("Enter a valid User ID or email address");
+    }
+    return parsed.data;
+  })
   .handler(async ({ data, context }) => {
-    const { data: receiver } = await supabaseAdmin
-      .from("profiles")
-      .select("id, name, user_id")
-      .eq("user_id", data.receiverUserId)
-      .maybeSingle();
+    const raw = data.receiverUserId.trim();
+    const isEmail = EMAIL_RE.test(raw);
 
-    if (!receiver) throw new Error("User ID not found");
+    const query = supabaseAdmin.from("profiles").select("id, name, user_id");
+    const { data: receiver } = isEmail
+      ? await query.ilike("email", raw).maybeSingle()
+      : await query.eq("user_id", raw.toLowerCase()).maybeSingle();
+
+    if (!receiver) throw new Error("No account found for that User ID or email");
     if (receiver.id === context.userId) {
       throw new Error("You cannot send money to yourself");
     }
