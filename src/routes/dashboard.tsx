@@ -620,8 +620,8 @@ function DashboardPage() {
               <div className="space-y-1">
                 <GlassInput
                   name="receiver"
-                  label="Receiver User ID"
-                  placeholder="username_123"
+                  label="Receiver (User ID or email)"
+                  placeholder="username_123 or name@email.com"
                   value={sendUserId}
                   onChange={(e) => {
                     setSendUserId(e.target.value);
