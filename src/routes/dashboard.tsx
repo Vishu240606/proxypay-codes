@@ -232,7 +232,7 @@ function DashboardPage() {
   };
 
   const handleLookupReceiver = async (raw: string) => {
-    const handle = raw.trim().toLowerCase();
+    const handle = raw.trim();
     setReceiverError(null);
     setReceiverInfo(null);
     if (!handle) return;
@@ -241,7 +241,12 @@ function DashboardPage() {
       const r = await lookupFn({ data: { receiverUserId: handle } });
       setReceiverInfo(r);
     } catch (err) {
-      setReceiverError(err instanceof Error ? err.message : "User ID not found");
+      const msg = err instanceof Error ? err.message : "Could not find that account";
+      // Strip any raw zod JSON that may leak through
+      const friendly = msg.startsWith("[") || msg.toLowerCase().includes("invalid_")
+        ? "Enter a valid User ID or email address"
+        : msg;
+      setReceiverError(friendly);
     } finally {
       setLookingUp(false);
     }
