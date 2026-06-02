@@ -71,24 +71,24 @@ function HistoryPage() {
         .order("created_at", { ascending: false });
 
       if (rows) {
-        // Resolve sender/receiver emails
         const ids = Array.from(
           new Set(rows.flatMap((r) => [r.sender_id, r.receiver_id])),
         );
         const { data: profiles } = await supabase
           .from("profiles")
-          .select("id, email")
+          .select("id, user_id")
           .in("id", ids);
-        const map = new Map(profiles?.map((p) => [p.id, p.email]) ?? []);
+        const map = new Map(profiles?.map((p) => [p.id, p.user_id]) ?? []);
         setTxs(
           rows.map((r) => ({
             ...r,
             amount: Number(r.amount),
-            sender_email: map.get(r.sender_id),
-            receiver_email: map.get(r.receiver_id),
+            sender_handle: map.get(r.sender_id),
+            receiver_handle: map.get(r.receiver_id),
           })) as Transaction[],
         );
       }
+
       setLoading(false);
     })();
   }, []);
