@@ -7,6 +7,7 @@ const CODE_TTL_SECONDS = 120; // 2 minutes
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no ambiguous chars
 
 const USER_ID_RE = /^[a-z0-9](?:[a-z0-9_]{0,30}[a-z0-9])?$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const userIdSchema = z
   .string()
   .trim()
@@ -14,6 +15,17 @@ const userIdSchema = z
   .max(32)
   .transform((v) => v.toLowerCase())
   .refine((v) => USER_ID_RE.test(v), { message: "Invalid User ID format" });
+
+/** Accepts either a public user_id (e.g. "venki_123") or an email address. */
+const receiverHandleSchema = z
+  .string()
+  .trim()
+  .min(2)
+  .max(254)
+  .refine(
+    (v) => EMAIL_RE.test(v) || USER_ID_RE.test(v.toLowerCase()),
+    { message: "Enter a valid User ID or email address" },
+  );
 
 function generateCode(): string {
   let out = "PX";
@@ -58,20 +70,28 @@ export const requestPaymentCode = createServerFn({ method: "POST" })
     );
   });
 
-/** Look up a receiver by their unique User ID, returning a safe public profile. */
-const LookupSchema = z.object({ receiverUserId: userIdSchema });
+/** Look up a receiver by their User ID OR registered email. */
+const LookupSchema = z.object({ receiverUserId: receiverHandleSchema });
 
 export const lookupReceiver = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => LookupSchema.parse(input))
+  .inputValidator((input: unknown) => {
+    const parsed = LookupSchema.safeParse(input);
+    if (!parsed.success) {
+      throw new Error("Enter a valid User ID or email address");
+    }
+    return parsed.data;
+  })
   .handler(async ({ data, context }) => {
-    const { data: receiver } = await supabaseAdmin
-      .from("profiles")
-      .select("id, name, user_id")
-      .eq("user_id", data.receiverUserId)
-      .maybeSingle();
+    const raw = data.receiverUserId.trim();
+    const isEmail = EMAIL_RE.test(raw);
 
-    if (!receiver) throw new Error("User ID not found");
+    const query = supabaseAdmin.from("profiles").select("id, name, user_id");
+    const { data: receiver } = isEmail
+      ? await query.ilike("email", raw).maybeSingle()
+      : await query.eq("user_id", raw.toLowerCase()).maybeSingle();
+
+    if (!receiver) throw new Error("No account found for that User ID or email");
     if (receiver.id === context.userId) {
       throw new Error("You cannot send money to yourself");
     }
