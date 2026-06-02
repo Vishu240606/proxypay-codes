@@ -190,7 +190,7 @@ function HistoryPage() {
             <ul className="divide-y divide-glass-border">
               {filtered.map((t) => {
                 const isOut = t.sender_id === userId;
-                const counter = isOut ? t.receiver_email : t.sender_email;
+                const counter = isOut ? t.receiver_handle : t.sender_handle;
                 return (
                   <li
                     key={t.id}
@@ -213,10 +213,11 @@ function HistoryPage() {
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 text-sm font-semibold">
                           {isOut ? "Sent to" : "Received from"}
-                          <span className="truncate text-muted-foreground">
-                            {counter ?? "unknown"}
+                          <span className="truncate font-mono text-muted-foreground">
+                            {counter ? `@${counter}` : "unknown"}
                           </span>
                         </div>
+
                         <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px] text-muted-foreground">
                           <span className="font-mono">{t.code}</span>
                           <span>·</span>
