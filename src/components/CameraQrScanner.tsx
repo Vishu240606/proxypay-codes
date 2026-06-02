@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
+import { Html5Qrcode, Html5QrcodeScannerState, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { Camera, CameraOff, Loader2 } from "lucide-react";
 
 interface Props {
@@ -10,21 +10,47 @@ interface Props {
 /**
  * Real webcam / mobile-camera QR scanner using html5-qrcode.
  * - Requests camera permission on mount
- * - Prefers the rear-facing camera on mobile
+ * - Prefers the rear-facing camera on mobile, falls back to any available device
  * - Fires onDetected once per scan; the parent controls re-scan via `paused`
+ * - Cleans up safely on unmount so closing the modal never crashes the app
  */
 export function CameraQrScanner({ onDetected, paused }: Props) {
   const containerId = useRef(`qr-cam-${Math.random().toString(36).slice(2)}`);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const firedRef = useRef(false);
+  const mountedRef = useRef(true);
   const [status, setStatus] = useState<"idle" | "starting" | "running" | "denied" | "unavailable">(
     "idle",
   );
 
+  // Safely stop + clear an html5-qrcode instance without ever throwing.
+  const safeTeardown = async (inst: Html5Qrcode | null) => {
+    if (!inst) return;
+    try {
+      const state = inst.getState?.();
+      if (state === Html5QrcodeScannerState.SCANNING || state === Html5QrcodeScannerState.PAUSED) {
+        await inst.stop();
+      }
+    } catch {
+      /* ignore stop errors */
+    }
+    try {
+      inst.clear();
+    } catch {
+      /* ignore clear errors (DOM may already be gone) */
+    }
+  };
+
   useEffect(() => {
+    mountedRef.current = true;
     let cancelled = false;
+
+    const setSafe: typeof setStatus = (s) => {
+      if (mountedRef.current && !cancelled) setStatus(s);
+    };
+
     const start = async () => {
-      setStatus("starting");
+      setSafe("starting");
       try {
         const instance = new Html5Qrcode(containerId.current, {
           verbose: false,
@@ -41,46 +67,62 @@ export function CameraQrScanner({ onDetected, paused }: Props) {
           aspectRatio: 1,
         };
 
-        await instance.start(
-          { facingMode: { ideal: "environment" } },
-          config,
-          (decoded) => {
-            if (firedRef.current) return;
-            firedRef.current = true;
+        const onDecode = (decoded: string) => {
+          if (firedRef.current || !mountedRef.current) return;
+          firedRef.current = true;
+          try {
             onDetected(decoded.trim());
-          },
-          () => {
-            /* ignore per-frame decode misses */
-          },
-        );
-        if (cancelled) {
-          try { await instance.stop(); } catch { /* noop */ }
-          try { instance.clear(); } catch { /* noop */ }
+          } catch {
+            /* parent handler errors must not crash the scanner */
+          }
+        };
+
+        // Try rear camera first, then any camera, then enumerate devices.
+        try {
+          await instance.start(
+            { facingMode: { ideal: "environment" } },
+            config,
+            onDecode,
+            () => {},
+          );
+        } catch {
+          try {
+            await instance.start({ facingMode: "user" }, config, onDecode, () => {});
+          } catch {
+            const devices = await Html5Qrcode.getCameras().catch(() => []);
+            if (!devices || devices.length === 0) throw new Error("No camera available");
+            await instance.start({ deviceId: { exact: devices[0].id } }, config, onDecode, () => {});
+          }
+        }
+
+        if (cancelled || !mountedRef.current) {
+          await safeTeardown(instance);
           return;
         }
-        setStatus("running");
+        setSafe("running");
       } catch (err) {
         const msg = err instanceof Error ? err.message.toLowerCase() : "";
-        if (msg.includes("permission") || msg.includes("denied") || msg.includes("notallowed")) {
-          setStatus("denied");
+        if (
+          msg.includes("permission") ||
+          msg.includes("denied") ||
+          msg.includes("notallowed")
+        ) {
+          setSafe("denied");
         } else {
-          setStatus("unavailable");
+          setSafe("unavailable");
         }
       }
     };
-    start();
+
+    void start();
+
     return () => {
+      mountedRef.current = false;
       cancelled = true;
       const inst = scannerRef.current;
       scannerRef.current = null;
-      if (inst) {
-        inst
-          .stop()
-          .catch(() => {})
-          .finally(() => {
-            try { inst.clear(); } catch { /* noop */ }
-          });
-      }
+      // Fire-and-forget teardown; never let it throw into React.
+      void safeTeardown(inst);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -92,12 +134,15 @@ export function CameraQrScanner({ onDetected, paused }: Props) {
 
   return (
     <div className="relative h-full w-full">
-      <div id={containerId.current} className="absolute inset-0 [&_video]:h-full [&_video]:w-full [&_video]:object-cover" />
+      <div
+        id={containerId.current}
+        className="absolute inset-0 [&_video]:h-full [&_video]:w-full [&_video]:object-cover"
+      />
 
       {/* Status overlays */}
       {status !== "running" && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/70 px-4 text-center">
-          {status === "starting" && (
+          {(status === "idle" || status === "starting") && (
             <>
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
               <p className="text-xs text-muted-foreground">Requesting camera…</p>
