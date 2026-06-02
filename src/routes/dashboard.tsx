@@ -156,13 +156,26 @@ function DashboardPage() {
       });
     }
     if (t) {
+      const ids = Array.from(
+        new Set(t.flatMap((r) => [r.sender_id, r.receiver_id])),
+      );
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, user_id")
+        .in("id", ids);
+      const map = new Map(profiles?.map((p) => [p.id, p.user_id]) ?? []);
       setTxs(
         t.map((row) => ({
           ...row,
           amount: Number(row.amount),
+          counter_handle:
+            row.sender_id === userId
+              ? map.get(row.receiver_id)
+              : map.get(row.sender_id),
         })) as Transaction[],
       );
     }
+
     setLoadingProfile(false);
   };
 
