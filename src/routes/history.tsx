@@ -154,7 +154,7 @@ function HistoryPage() {
               <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
               <GlassInput
                 name="search"
-                placeholder="Search by email or code…"
+                placeholder="Search by User ID or code…"
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 className="pl-9"
