@@ -685,12 +685,16 @@ function DashboardPage() {
                   <li key={tx.id} className="flex items-center justify-between py-3">
                     <div>
                       <div className="text-sm font-medium">
-                        {isOutgoing ? "Sent" : "Received"}
+                        {isOutgoing ? "Sent to " : "Received from "}
+                        <span className="font-mono text-muted-foreground">
+                          {tx.counter_handle ? `@${tx.counter_handle}` : "unknown"}
+                        </span>
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        Code {tx.code} · {new Date(tx.created_at).toLocaleString()}
+                        {tx.payment_type === "qr" ? "QR" : `Code ${tx.code}`} · {new Date(tx.created_at).toLocaleString()}
                       </div>
                     </div>
+
                     <div
                       className={`font-mono text-sm font-semibold ${isOutgoing ? "text-destructive" : "text-primary"}`}
                     >
