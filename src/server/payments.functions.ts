@@ -7,6 +7,7 @@ const CODE_TTL_SECONDS = 120; // 2 minutes
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no ambiguous chars
 
 const USER_ID_RE = /^[a-z0-9](?:[a-z0-9_]{0,30}[a-z0-9])?$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const userIdSchema = z
   .string()
   .trim()
@@ -14,6 +15,17 @@ const userIdSchema = z
   .max(32)
   .transform((v) => v.toLowerCase())
   .refine((v) => USER_ID_RE.test(v), { message: "Invalid User ID format" });
+
+/** Accepts either a public user_id (e.g. "venki_123") or an email address. */
+const receiverHandleSchema = z
+  .string()
+  .trim()
+  .min(2)
+  .max(254)
+  .refine(
+    (v) => EMAIL_RE.test(v) || USER_ID_RE.test(v.toLowerCase()),
+    { message: "Enter a valid User ID or email address" },
+  );
 
 function generateCode(): string {
   let out = "PX";
