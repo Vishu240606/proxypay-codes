@@ -54,7 +54,10 @@ interface Transaction {
   amount: number;
   code: string;
   created_at: string;
+  payment_type?: string;
+  counter_handle?: string;
 }
+
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
@@ -153,13 +156,26 @@ function DashboardPage() {
       });
     }
     if (t) {
+      const ids = Array.from(
+        new Set(t.flatMap((r) => [r.sender_id, r.receiver_id])),
+      );
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, user_id")
+        .in("id", ids);
+      const map = new Map(profiles?.map((p) => [p.id, p.user_id]) ?? []);
       setTxs(
         t.map((row) => ({
           ...row,
           amount: Number(row.amount),
+          counter_handle:
+            row.sender_id === userId
+              ? map.get(row.receiver_id)
+              : map.get(row.sender_id),
         })) as Transaction[],
       );
     }
+
     setLoadingProfile(false);
   };
 
@@ -669,12 +685,16 @@ function DashboardPage() {
                   <li key={tx.id} className="flex items-center justify-between py-3">
                     <div>
                       <div className="text-sm font-medium">
-                        {isOutgoing ? "Sent" : "Received"}
+                        {isOutgoing ? "Sent to " : "Received from "}
+                        <span className="font-mono text-muted-foreground">
+                          {tx.counter_handle ? `@${tx.counter_handle}` : "unknown"}
+                        </span>
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        Code {tx.code} · {new Date(tx.created_at).toLocaleString()}
+                        {tx.payment_type === "qr" ? "QR" : `Code ${tx.code}`} · {new Date(tx.created_at).toLocaleString()}
                       </div>
                     </div>
+
                     <div
                       className={`font-mono text-sm font-semibold ${isOutgoing ? "text-destructive" : "text-primary"}`}
                     >

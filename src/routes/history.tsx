@@ -14,9 +14,10 @@ interface Transaction {
   code: string;
   created_at: string;
   payment_type?: string;
-  sender_email?: string;
-  receiver_email?: string;
+  sender_handle?: string;
+  receiver_handle?: string;
 }
+
 
 export const Route = createFileRoute("/history")({
   head: () => ({
@@ -70,24 +71,24 @@ function HistoryPage() {
         .order("created_at", { ascending: false });
 
       if (rows) {
-        // Resolve sender/receiver emails
         const ids = Array.from(
           new Set(rows.flatMap((r) => [r.sender_id, r.receiver_id])),
         );
         const { data: profiles } = await supabase
           .from("profiles")
-          .select("id, email")
+          .select("id, user_id")
           .in("id", ids);
-        const map = new Map(profiles?.map((p) => [p.id, p.email]) ?? []);
+        const map = new Map(profiles?.map((p) => [p.id, p.user_id]) ?? []);
         setTxs(
           rows.map((r) => ({
             ...r,
             amount: Number(r.amount),
-            sender_email: map.get(r.sender_id),
-            receiver_email: map.get(r.receiver_id),
+            sender_handle: map.get(r.sender_id),
+            receiver_handle: map.get(r.receiver_id),
           })) as Transaction[],
         );
       }
+
       setLoading(false);
     })();
   }, []);
@@ -99,7 +100,7 @@ function HistoryPage() {
       if (filter === "received" && isOut) return false;
       if (q) {
         const needle = q.toLowerCase();
-        const counter = (isOut ? t.receiver_email : t.sender_email) ?? "";
+        const counter = (isOut ? t.receiver_handle : t.sender_handle) ?? "";
         if (
           !counter.toLowerCase().includes(needle) &&
           !t.code.toLowerCase().includes(needle)
@@ -107,6 +108,7 @@ function HistoryPage() {
           return false;
         }
       }
+
       return true;
     });
   }, [txs, filter, q, userId]);
@@ -152,7 +154,7 @@ function HistoryPage() {
               <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
               <GlassInput
                 name="search"
-                placeholder="Search by email or code…"
+                placeholder="Search by User ID or code…"
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 className="pl-9"
@@ -188,7 +190,7 @@ function HistoryPage() {
             <ul className="divide-y divide-glass-border">
               {filtered.map((t) => {
                 const isOut = t.sender_id === userId;
-                const counter = isOut ? t.receiver_email : t.sender_email;
+                const counter = isOut ? t.receiver_handle : t.sender_handle;
                 return (
                   <li
                     key={t.id}
@@ -211,10 +213,11 @@ function HistoryPage() {
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 text-sm font-semibold">
                           {isOut ? "Sent to" : "Received from"}
-                          <span className="truncate text-muted-foreground">
-                            {counter ?? "unknown"}
+                          <span className="truncate font-mono text-muted-foreground">
+                            {counter ? `@${counter}` : "unknown"}
                           </span>
                         </div>
+
                         <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px] text-muted-foreground">
                           <span className="font-mono">{t.code}</span>
                           <span>·</span>
