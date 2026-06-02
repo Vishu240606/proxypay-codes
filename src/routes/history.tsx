@@ -100,7 +100,7 @@ function HistoryPage() {
       if (filter === "received" && isOut) return false;
       if (q) {
         const needle = q.toLowerCase();
-        const counter = (isOut ? t.receiver_email : t.sender_email) ?? "";
+        const counter = (isOut ? t.receiver_handle : t.sender_handle) ?? "";
         if (
           !counter.toLowerCase().includes(needle) &&
           !t.code.toLowerCase().includes(needle)
@@ -108,6 +108,7 @@ function HistoryPage() {
           return false;
         }
       }
+
       return true;
     });
   }, [txs, filter, q, userId]);
