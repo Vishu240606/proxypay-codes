@@ -14,9 +14,10 @@ interface Transaction {
   code: string;
   created_at: string;
   payment_type?: string;
-  sender_email?: string;
-  receiver_email?: string;
+  sender_handle?: string;
+  receiver_handle?: string;
 }
+
 
 export const Route = createFileRoute("/history")({
   head: () => ({
