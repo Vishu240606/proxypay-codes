@@ -255,13 +255,35 @@ function DashboardPage() {
   const startPaymentFlow = async (e: FormEvent) => {
     e.preventDefault();
     const amt = Number(sendAmt);
-    if (!receiverInfo) {
-      toast.error("Verify the receiver User ID first");
+    const handle = sendUserId.trim();
+    if (!handle) {
+      toast.error("Enter the receiver's User ID or email");
       return;
     }
     if (!sendCode || isNaN(amt) || amt <= 0) {
       toast.error("Fill in all fields with a valid amount");
       return;
+    }
+
+    // Resolve receiver inline if not yet verified (handles email + no-blur cases)
+    let info = receiverInfo;
+    if (!info) {
+      setLookingUp(true);
+      try {
+        info = await lookupFn({ data: { receiverUserId: handle } });
+        setReceiverInfo(info);
+        setReceiverError(null);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Could not find that account";
+        const friendly = msg.startsWith("[") || msg.toLowerCase().includes("invalid_")
+          ? "Enter a valid User ID or email address"
+          : msg;
+        setReceiverError(friendly);
+        toast.error(friendly);
+        return;
+      } finally {
+        setLookingUp(false);
+      }
     }
 
     setPaymentSource("code");
@@ -273,7 +295,7 @@ function DashboardPage() {
     try {
       await validateFn({
         data: {
-          receiverUserId: receiverInfo.userId,
+          receiverUserId: info.userId,
           amount: amt,
           code: sendCode.trim().toUpperCase(),
         },
@@ -285,7 +307,7 @@ function DashboardPage() {
       pushNotification({
         kind: "security",
         title: "Invalid session attempt blocked",
-        message: `${msg}. Receiver: @${receiverInfo.userId}`,
+        message: `${msg}. Receiver: @${info.userId}`,
       });
       return;
     }
