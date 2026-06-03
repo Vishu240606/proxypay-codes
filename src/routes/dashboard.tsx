@@ -24,12 +24,12 @@ import {
   sendMoney,
   validatePaymentCode,
   lookupReceiver,
-} from "@/server/payments.functions";
+} from "@/lib/payments.functions";
 import {
   generateQrSession,
   scanQrSession,
   sendMoneyByQr,
-} from "@/server/qr.functions";
+} from "@/lib/qr.functions";
 import { useAuthedFn } from "@/hooks/useAuthedFn";
 import { pushNotification } from "@/lib/notifications";
 
