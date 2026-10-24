@@ -116,6 +116,7 @@ export type Database = {
           code: string
           created_at: string
           id: string
+          idempotency_key: string | null
           payment_type: string
           receiver_id: string
           sender_id: string
@@ -125,6 +126,7 @@ export type Database = {
           code?: string
           created_at?: string
           id?: string
+          idempotency_key?: string | null
           payment_type?: string
           receiver_id: string
           sender_id: string
@@ -134,6 +136,7 @@ export type Database = {
           code?: string
           created_at?: string
           id?: string
+          idempotency_key?: string | null
           payment_type?: string
           receiver_id?: string
           sender_id?: string
@@ -145,7 +148,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      complete_payment: {
+        Args: {
+          p_amount: number
+          p_idempotency_key: string
+          p_kind: string
+          p_sender: string
+          p_session_key: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never
