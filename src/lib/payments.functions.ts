@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { mapPaymentError } from "@/lib/payment-errors";
 
 const CODE_TTL_SECONDS = 120; // 2 minutes
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no ambiguous chars
@@ -209,44 +210,27 @@ export const sendMoney = createServerFn({ method: "POST" })
     if (sErr || !sender) throw new Error("Sender profile not found");
     if (Number(sender.balance) < data.amount) throw new Error("Insufficient balance");
 
-    const { data: claimed, error: claimErr } = await supabaseAdmin
-      .from("payment_codes")
-      .update({ used: true, used_at: new Date().toISOString() })
-      .eq("id", codeRow.id)
-      .eq("used", false)
-      .select()
-      .maybeSingle();
+    // Final atomic step: session claim, sender debit, receiver credit,
+    // transaction record and code invalidation all happen inside a single
+    // database statement guarded by row locks and a unique idempotency key.
+    // Success is returned only after the database commits.
+    const { data: result, error: payErr } = await supabaseAdmin.rpc("complete_payment", {
+      p_kind: "code",
+      p_session_key: codeRow.code,
+      p_sender: senderId,
+      p_amount: data.amount,
+      p_idempotency_key: `code:${codeRow.id}`,
+    });
 
-    if (claimErr || !claimed) throw new Error("Code already used");
-
-    const newSenderBal = Number(sender.balance) - data.amount;
-    const newReceiverBal = Number(receiver.balance) + data.amount;
-
-    const { error: u1 } = await supabaseAdmin
-      .from("profiles")
-      .update({ balance: newSenderBal })
-      .eq("id", senderId);
-    if (u1) throw new Error("Transfer failed");
-
-    const { error: u2 } = await supabaseAdmin
-      .from("profiles")
-      .update({ balance: newReceiverBal })
-      .eq("id", receiver.id);
-    if (u2) {
-      await supabaseAdmin.from("profiles").update({ balance: sender.balance }).eq("id", senderId);
-      throw new Error("Transfer failed");
+    if (payErr || !result) {
+      throw new Error(mapPaymentError("code", payErr?.message, "Transfer failed"));
     }
 
-    await supabaseAdmin.from("transactions").insert({
-      sender_id: senderId,
-      receiver_id: receiver.id,
-      amount: data.amount,
-      code: codeRow.code,
-    });
+    const settled = result as { new_sender_balance: number | string };
 
     return {
       success: true,
-      newBalance: newSenderBal,
+      newBalance: Number(settled.new_sender_balance),
       amount: data.amount,
       receiverUserId: receiver.user_id,
     };

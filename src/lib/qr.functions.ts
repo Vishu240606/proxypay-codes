@@ -3,6 +3,7 @@ import { z } from "zod";
 import { randomBytes, createHmac } from "crypto";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { mapPaymentError } from "@/lib/payment-errors";
 
 const QR_TTL_SECONDS = 90;
 
