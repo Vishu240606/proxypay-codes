@@ -3,6 +3,7 @@ import { z } from "zod";
 import { randomBytes, createHmac } from "crypto";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { mapPaymentError } from "@/lib/payment-errors";
 
 const QR_TTL_SECONDS = 90;
 
@@ -137,47 +138,27 @@ export const sendMoneyByQr = createServerFn({ method: "POST" })
     if (!sender) throw new Error("Sender profile not found");
     if (Number(sender.balance) < data.amount) throw new Error("Insufficient balance");
 
-    // 4. Claim session (idempotency guard)
-    const { data: claimed } = await supabaseAdmin
-      .from("qr_sessions")
-      .update({ used: true, status: "completed", used_at: new Date().toISOString() })
-      .eq("id", session.id)
-      .eq("used", false)
-      .select()
-      .maybeSingle();
-    if (!claimed) throw new Error("QR code already used");
+    // 4. Atomic completion: session claim, sender debit, receiver credit,
+    // transaction record and session invalidation all happen inside a single
+    // database statement guarded by row locks and a unique idempotency key.
+    // Success is returned only after the database commits.
+    const { data: result, error: payErr } = await supabaseAdmin.rpc("complete_payment", {
+      p_kind: "qr",
+      p_session_key: data.token,
+      p_sender: senderId,
+      p_amount: data.amount,
+      p_idempotency_key: `qr:${session.id}`,
+    });
 
-    // 5. Transfer
-    const newSenderBal = Number(sender.balance) - data.amount;
-    const newReceiverBal = Number(receiver.balance) + data.amount;
-
-    const { error: u1 } = await supabaseAdmin
-      .from("profiles")
-      .update({ balance: newSenderBal })
-      .eq("id", senderId);
-    if (u1) throw new Error("Transfer failed");
-
-    const { error: u2 } = await supabaseAdmin
-      .from("profiles")
-      .update({ balance: newReceiverBal })
-      .eq("id", receiver.id);
-    if (u2) {
-      await supabaseAdmin.from("profiles").update({ balance: sender.balance }).eq("id", senderId);
-      throw new Error("Transfer failed");
+    if (payErr || !result) {
+      throw new Error(mapPaymentError("qr", payErr?.message, "Transfer failed"));
     }
 
-    // 6. Log transaction
-    await supabaseAdmin.from("transactions").insert({
-      sender_id: senderId,
-      receiver_id: receiver.id,
-      amount: data.amount,
-      code: session.token.slice(0, 12),
-      payment_type: "qr",
-    });
+    const settled = result as { new_sender_balance: number | string };
 
     return {
       success: true,
-      newBalance: newSenderBal,
+      newBalance: Number(settled.new_sender_balance),
       amount: data.amount,
       receiverUserId: receiver.user_id,
     };
